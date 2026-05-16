@@ -1,12 +1,12 @@
-# MetalKit v0.2.0 coverage audit
+# MetalKit v0.2.1 coverage audit
 
-This crate targets the MetalKit surface requested for `v0.2.0`: `MTKView`, `MTKTextureLoader`, `MTKMesh`, `MTKMeshBuffer`, `MTKSubmesh`, `MTKMeshBufferAllocator`, and the Model I/O integration APIs in `MTKModel.h`.
+This crate targets the MetalKit surface requested for `v0.2.1`: `MTKView`, `MTKTextureLoader`, `MTKMesh`, `MTKMeshBuffer`, `MTKSubmesh`, `MTKMeshBufferAllocator`, and the Model I/O integration APIs in `MTKModel.h`.
 
 ## Legend
 
 - ✅ Implemented in the safe Rust API
 - 🟡 Implemented, but exposed as a raw-pointer or JSON-backed helper because the lower-level dependency crate does not yet provide a typed wrapper
-- ⚪ Audited but intentionally not wrapped in `v0.2.0`
+- ⚪ Audited but intentionally not wrapped in `v0.2.1`
 
 ## `MTKView.h`
 
@@ -44,7 +44,7 @@ This crate targets the MetalKit surface requested for `v0.2.0`: `MTKView`, `MTKT
 
 | Header surface | Status | Notes |
 | --- | --- | --- |
-| error domain / error key constants | ✅ | `texture_loader_error` |
+| error string-enum + domain / error key constants | ✅ | `TextureLoaderError` + `texture_loader_error` |
 | option constants: mipmaps / sRGB / usage / storage / CPU cache / cube layout / origin / load-as-array | ✅ | `TextureLoaderOptions` + constant modules |
 | `newTextureWithContentsOfURL:options:error:` | ✅ | `new_texture_from_url` |
 | `newTexturesWithContentsOfURLs:options:error:` | ✅ | `new_textures_from_urls` with per-element success/failure reporting |
@@ -54,12 +54,13 @@ This crate targets the MetalKit surface requested for `v0.2.0`: `MTKView`, `MTKT
 | `newTextureWithName:scaleFactor:bundle:options:error:` | ✅ | `new_texture_named` |
 | `newTextureWithName:scaleFactor:displayGamut:bundle:options:error:` | ✅ | `new_texture_named_with_display_gamut` |
 | array-of-names helpers | ✅ | `new_textures_named*`, represented as `TextureLoaderArrayOutcome` |
-| completion-handler variants | ⚪ | Audited but not wrapped in `v0.2.0`; current crate focuses on the synchronous loading surface |
+| completion-handler variants | ✅ | `*_with_callback` wrappers + `TextureLoaderCallback` / `TextureLoaderArrayCallback` |
 
 ## `MTKModel.h` mesh bridge + Model I/O integration
 
 | Header surface | Status | Notes |
 | --- | --- | --- |
+| model error string-enum + domain / error key constants | ✅ | `ModelError` + `model_error` |
 | `MTKMeshBufferAllocator` init/device/newBuffer APIs | ✅ | `MeshBufferAllocator` |
 | `MTKMeshBuffer` allocator/zone/length/offset/type/buffer/name | ✅ | `MeshBuffer` |
 | `MTKSubmesh` primitive/index/indexBuffer/indexCount/mesh/name | ✅ | `Submesh` |

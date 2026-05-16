@@ -2,10 +2,14 @@ use apple_cf::cg::CGContext;
 use apple_metal::MetalDevice;
 use metalkit::{TextureLoader, TextureLoaderOptions};
 use std::error::Error;
+use std::io;
 use std::path::Path;
+use std::sync::mpsc;
+use std::time::Duration;
 
 const SYSTEM_ICON: &str =
     "/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/PublicFolderIcon.icns";
+const CALLBACK_TIMEOUT: Duration = Duration::from_secs(10);
 
 fn main() -> Result<(), Box<dyn Error>> {
     let device = MetalDevice::system_default().expect("no Metal device available");
@@ -22,6 +26,35 @@ fn main() -> Result<(), Box<dyn Error>> {
         assert!(url_texture.height() > 0);
         assert_eq!(url_texture.width(), data_texture.width());
         assert_eq!(url_texture.height(), data_texture.height());
+
+        let (tx, rx) = mpsc::channel();
+        loader.new_texture_from_url_with_callback(SYSTEM_ICON, Some(&options), move |result| {
+            tx.send(result.map(|texture| (texture.width(), texture.height())).map_err(|error| error.to_string()))
+                .expect("send async texture result");
+        })?;
+        let async_texture = rx
+            .recv_timeout(CALLBACK_TIMEOUT)
+            .expect("texture callback timed out")
+            .map_err(io::Error::other)?;
+        assert_eq!(async_texture, (url_texture.width(), url_texture.height()));
+
+        let (tx, rx) = mpsc::channel();
+        loader.new_textures_from_urls_with_callback(
+            &[Path::new(SYSTEM_ICON), Path::new("/definitely/missing-texture.png")],
+            Some(&options),
+            move |outcome| {
+                tx.send((
+                    outcome.textures.iter().filter(|texture| texture.is_some()).count(),
+                    outcome.error.is_some(),
+                ))
+                .expect("send async texture array result");
+            },
+        )?;
+        let (loaded_count, had_error) = rx
+            .recv_timeout(CALLBACK_TIMEOUT)
+            .expect("texture array callback timed out");
+        assert_eq!(loaded_count, 1);
+        assert!(had_error);
     }
 
     let context = CGContext::new_rgba8(2, 2)?;

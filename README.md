@@ -2,12 +2,12 @@
 
 Safe `Rust` bindings for Apple's [`MetalKit`](https://developer.apple.com/documentation/metalkit) framework on `macOS`.
 
-> **Status:** v0.2.0 expands the crate across `MTKView`, `MTKTextureLoader`, `MTKMesh`, `MTKMeshBuffer`, `MTKSubmesh`, `MTKMeshBufferAllocator`, and `Model I/O` integration helpers used by `MTKModel.h`.
+> **Status:** v0.2.1 expands the crate across `MTKView`, `MTKTextureLoader`, `MTKMesh`, `MTKMeshBuffer`, `MTKSubmesh`, `MTKMeshBufferAllocator`, and `Model I/O` integration helpers used by `MTKModel.h`.
 
-## What v0.2.0 covers
+## What v0.2.1 covers
 
 - `View` + `ViewDelegate` wrappers for `MTKView`
-- `TextureLoader` sync loading from URLs, data, `CGImage`, `MDLTexture`, and named-texture failure handling helpers
+- `TextureLoader` sync and completion-handler loading from URLs, data, `CGImage`, `MDLTexture`, plus named-texture and batch failure handling helpers
 - `MeshBufferAllocator`, `MeshBuffer`, `Submesh`, and `Mesh` wrappers for `MetalKit` mesh bridging
 - `ModelAsset`, `ModelMesh`, `ModelTexture`, and vertex-descriptor conversion helpers for `Model I/O` integration
 - Raw-pointer accessors for `Metal` types that `apple-metal-rs` does not wrap yet (`CAMetalDrawable`, render-pass descriptors, preferred device)
@@ -61,7 +61,7 @@ cargo test
 ## Notes
 
 - `MTKView` render-pass descriptors and drawables are exposed as raw pointers for now because `apple-metal-rs` does not yet ship typed wrappers for those `Metal` objects.
-- The `TextureLoader` surface focuses on the synchronous APIs; see [`COVERAGE.md`](COVERAGE.md) for the exact audit status of completion-handler variants.
+- `TextureLoader` exposes both synchronous and completion-handler APIs; see [`COVERAGE.md`](COVERAGE.md) for the exact header-level audit status.
 
 ## License
 

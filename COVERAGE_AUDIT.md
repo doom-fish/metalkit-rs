@@ -6,13 +6,13 @@ Methodology notes:
 - Counted MetalKit interfaces, protocols, properties, methods, NSString-backed typealiases, exported constants, and top-level conversion functions declared in the MetalKit headers.
 - Filtered out `NS_UNAVAILABLE` default initializers per the audit instructions; MetalKit.framework does not expose additional macOS-unavailable or deprecated public symbols in these headers.
 - Did not count inherited `ModelIO` protocol requirements that are not declared in MetalKit headers (for example `MDLMeshBufferAllocator` buffer-creation requirements or the `MDLNamed`-inherited `name` on `MTKMeshBuffer`).
-- `TextureLoader::new_textures_from_urls(...)` is treated as semantic coverage for the synchronous array-of-URLs loader even though the Swift bridge fans out through repeated single-texture loads. The callback-based `completionHandler:` family remains a gap because the crate exposes no async callback bridge.
+- `TextureLoader::new_textures_from_urls(...)` is treated as semantic coverage for the synchronous array-of-URLs loader even though the Swift bridge fans out through repeated single-texture loads. The callback-based API is covered by the `*_with_callback(...)` wrappers and the public `TextureLoaderCallback` / `TextureLoaderArrayCallback` aliases.
 
 SDK_PUBLIC_SYMBOLS: 108
-VERIFIED: 95
-GAPS: 13
+VERIFIED: 108
+GAPS: 0
 EXEMPT: 0
-COVERAGE_PCT: 87.96%
+COVERAGE_PCT: 100.00%
 
 ## 🟢 VERIFIED
 | Symbol | Kind | Header | Wrapped by |
@@ -54,6 +54,7 @@ COVERAGE_PCT: 87.96%
 | `MTKTextureLoader` | interface | `MTKTextureLoader.h` | `TextureLoader` |
 | `MTKTextureLoaderErrorDomain` | constant | `MTKTextureLoader.h` | `texture_loader_error::DOMAIN` |
 | `MTKTextureLoaderErrorKey` | constant | `MTKTextureLoader.h` | `texture_loader_error::KEY` |
+| `MTKTextureLoaderError` | typealias | `MTKTextureLoader.h` | `TextureLoaderError` |
 | `MTKTextureLoaderOption` | typealias | `MTKTextureLoader.h` | `TextureLoaderOptionKey` |
 | `MTKTextureLoaderOptionAllocateMipmaps` | constant | `MTKTextureLoader.h` | `texture_loader_option::ALLOCATE_MIPMAPS`; `TextureLoaderOptions::with_allocate_mipmaps(...)` |
 | `MTKTextureLoaderOptionGenerateMipmaps` | constant | `MTKTextureLoader.h` | `texture_loader_option::GENERATE_MIPMAPS`; `TextureLoaderOptions::with_generate_mipmaps(...)` |
@@ -72,15 +73,27 @@ COVERAGE_PCT: 87.96%
 | `MTKTextureLoaderOptionLoadAsArray` | constant | `MTKTextureLoader.h` | `texture_loader_option::LOAD_AS_ARRAY`; `TextureLoaderOptions::with_load_as_array(...)` |
 | `MTKTextureLoader.device` | property | `MTKTextureLoader.h` | `TextureLoader::device_ptr()` (raw `MTLDevice` pointer) |
 | `MTKTextureLoader.initWithDevice(_)` | initializer | `MTKTextureLoader.h` | `TextureLoader::new(...)` |
+| `MTKTextureLoaderCallback` | typealias | `MTKTextureLoader.h` | `TextureLoaderCallback` |
+| `MTKTextureLoaderArrayCallback` | typealias | `MTKTextureLoader.h` | `TextureLoaderArrayCallback` |
 | `MTKTextureLoader.newTextureWithContentsOfURL(_:options:error:)` | instance method | `MTKTextureLoader.h` | `TextureLoader::new_texture_from_url(...)` |
+| `MTKTextureLoader.newTextureWithContentsOfURL(_:options:completionHandler:)` | instance method | `MTKTextureLoader.h` | `TextureLoader::new_texture_from_url_with_callback(...)` |
 | `MTKTextureLoader.newTexturesWithContentsOfURLs(_:options:error:)` | instance method | `MTKTextureLoader.h` | `TextureLoader::new_textures_from_urls(...)` via `TextureLoaderArrayOutcome` (semantic batch equivalent) |
+| `MTKTextureLoader.newTexturesWithContentsOfURLs(_:options:completionHandler:)` | instance method | `MTKTextureLoader.h` | `TextureLoader::new_textures_from_urls_with_callback(...)` |
 | `MTKTextureLoader.newTextureWithData(_:options:error:)` | instance method | `MTKTextureLoader.h` | `TextureLoader::new_texture_from_data(...)` |
+| `MTKTextureLoader.newTextureWithData(_:options:completionHandler:)` | instance method | `MTKTextureLoader.h` | `TextureLoader::new_texture_from_data_with_callback(...)` |
 | `MTKTextureLoader.newTextureWithCGImage(_:options:error:)` | instance method | `MTKTextureLoader.h` | `TextureLoader::new_texture_from_cgimage(...)` |
+| `MTKTextureLoader.newTextureWithCGImage(_:options:completionHandler:)` | instance method | `MTKTextureLoader.h` | `TextureLoader::new_texture_from_cgimage_with_callback(...)` |
 | `MTKTextureLoader.newTextureWithMDLTexture(_:options:error:)` | instance method | `MTKTextureLoader.h` | `TextureLoader::new_texture_from_model_texture(...)` |
+| `MTKTextureLoader.newTextureWithMDLTexture(_:options:completionHandler:)` | instance method | `MTKTextureLoader.h` | `TextureLoader::new_texture_from_model_texture_with_callback(...)` |
 | `MTKTextureLoader.newTextureWithName(_:scaleFactor:bundle:options:error:)` | instance method | `MTKTextureLoader.h` | `TextureLoader::new_texture_named(...)` |
+| `MTKTextureLoader.newTextureWithName(_:scaleFactor:bundle:options:completionHandler:)` | instance method | `MTKTextureLoader.h` | `TextureLoader::new_texture_named_with_callback(...)` |
 | `MTKTextureLoader.newTextureWithName(_:scaleFactor:displayGamut:bundle:options:error:)` | instance method | `MTKTextureLoader.h` | `TextureLoader::new_texture_named_with_display_gamut(...)` |
+| `MTKTextureLoader.newTextureWithName(_:scaleFactor:displayGamut:bundle:options:completionHandler:)` | instance method | `MTKTextureLoader.h` | `TextureLoader::new_texture_named_with_display_gamut_with_callback(...)` |
+| `MTKTextureLoader.newTexturesWithNames(_:scaleFactor:bundle:options:completionHandler:)` | instance method | `MTKTextureLoader.h` | `TextureLoader::new_textures_named_with_callback(...)` |
+| `MTKTextureLoader.newTexturesWithNames(_:scaleFactor:displayGamut:bundle:options:completionHandler:)` | instance method | `MTKTextureLoader.h` | `TextureLoader::new_textures_named_with_display_gamut_with_callback(...)` |
 | `MTKModelErrorDomain` | constant | `MTKModel.h` | `model_error::DOMAIN` |
 | `MTKModelErrorKey` | constant | `MTKModel.h` | `model_error::KEY` |
+| `MTKModelError` | typealias | `MTKModel.h` | `ModelError` |
 | `MTKMeshBufferAllocator` | interface | `MTKModel.h` | `MeshBufferAllocator` |
 | `MTKMeshBufferAllocator.initWithDevice(_)` | initializer | `MTKModel.h` | `MeshBufferAllocator::new(...)` |
 | `MTKMeshBufferAllocator.device` | property | `MTKModel.h` | `MeshBufferAllocator::device_ptr()` (raw `MTLDevice` pointer) |
@@ -116,19 +129,8 @@ COVERAGE_PCT: 87.96%
 ## 🔴 GAPS
 | Symbol | Kind | Header | Notes |
 | --- | --- | --- | --- |
-| `MTKTextureLoaderError` | typealias | `MTKTextureLoader.h` | No dedicated Rust string-enum wrapper; the public API exposes `texture_loader_error::{DOMAIN, KEY}` and converts loader failures into `MetalKitError`. |
-| `MTKTextureLoaderCallback` | typealias | `MTKTextureLoader.h` | No public callback bridge or async Rust API; the crate only exposes synchronous `Result`-returning texture loads. |
-| `MTKTextureLoaderArrayCallback` | typealias | `MTKTextureLoader.h` | No public callback bridge; batch loads return synchronous `TextureLoaderArrayOutcome` values instead of invoking a completion handler. |
-| `MTKTextureLoader.newTextureWithContentsOfURL(_:options:completionHandler:)` | instance method | `MTKTextureLoader.h` | Only the synchronous `TextureLoader::new_texture_from_url(...)` API is exposed. |
-| `MTKTextureLoader.newTextureWithName(_:scaleFactor:bundle:options:completionHandler:)` | instance method | `MTKTextureLoader.h` | Only the synchronous `TextureLoader::new_texture_named(...)` API is exposed. |
-| `MTKTextureLoader.newTextureWithName(_:scaleFactor:displayGamut:bundle:options:completionHandler:)` | instance method | `MTKTextureLoader.h` | Only the synchronous `TextureLoader::new_texture_named_with_display_gamut(...)` API is exposed. |
-| `MTKTextureLoader.newTexturesWithContentsOfURLs(_:options:completionHandler:)` | instance method | `MTKTextureLoader.h` | Only the synchronous `TextureLoader::new_textures_from_urls(...)` batch helper is exposed. |
-| `MTKTextureLoader.newTexturesWithNames(_:scaleFactor:bundle:options:completionHandler:)` | instance method | `MTKTextureLoader.h` | The crate offers synchronous `new_textures_named(...)`, but no callback-based async wrapper for the SDK API. |
-| `MTKTextureLoader.newTexturesWithNames(_:scaleFactor:displayGamut:bundle:options:completionHandler:)` | instance method | `MTKTextureLoader.h` | The crate offers synchronous `new_textures_named_with_display_gamut(...)`, but no callback-based async wrapper for the SDK API. |
-| `MTKTextureLoader.newTextureWithData(_:options:completionHandler:)` | instance method | `MTKTextureLoader.h` | Only the synchronous `TextureLoader::new_texture_from_data(...)` API is exposed. |
-| `MTKTextureLoader.newTextureWithCGImage(_:options:completionHandler:)` | instance method | `MTKTextureLoader.h` | Only the synchronous `TextureLoader::new_texture_from_cgimage(...)` API is exposed. |
-| `MTKTextureLoader.newTextureWithMDLTexture(_:options:completionHandler:)` | instance method | `MTKTextureLoader.h` | Only the synchronous `TextureLoader::new_texture_from_model_texture(...)` API is exposed. |
-| `MTKModelError` | typealias | `MTKModel.h` | No dedicated Rust string-enum wrapper; the public API exposes `model_error::{DOMAIN, KEY}` and surfaces failures as `MetalKitError`. |
+
+No remaining gaps.
 
 ## ⏭️ EXEMPT
 | Symbol | Kind | Header | Reason | SDK attribute |

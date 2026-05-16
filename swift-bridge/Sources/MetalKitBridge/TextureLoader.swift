@@ -35,6 +35,64 @@ final class MTKTextureArrayBox: NSObject {
     }
 }
 
+public typealias MTKTextureLoaderRustCallback = @convention(c) (
+    UnsafeMutableRawPointer?,
+    UnsafeMutableRawPointer?,
+    UnsafeMutablePointer<CChar>?
+) -> Void
+
+public typealias MTKTextureLoaderRustArrayCallback = @convention(c) (
+    UnsafeMutableRawPointer?,
+    UnsafeMutableRawPointer?,
+    UnsafeMutablePointer<CChar>?
+) -> Void
+
+private func mtkCompleteTextureLoad(
+    callback: MTKTextureLoaderRustCallback?,
+    userData: UnsafeMutableRawPointer?,
+    texture: MTLTexture?,
+    error: Error?
+) {
+    guard let callback else { return }
+    callback(userData, mtkTakeRetained(texture.map { $0 as AnyObject }), mtkNSErrorMessage(error as NSError?))
+}
+
+private func mtkCompleteTextureArrayLoad(
+    callback: MTKTextureLoaderRustArrayCallback?,
+    userData: UnsafeMutableRawPointer?,
+    textures: [AnyObject],
+    expectedCount: Int,
+    error: Error?
+) {
+    guard let callback else { return }
+    var boxedTextures = textures.map { texture in
+        texture is NSNull ? nil : texture
+    }
+    if boxedTextures.count < expectedCount {
+        boxedTextures.append(contentsOf: repeatElement(nil, count: expectedCount - boxedTextures.count))
+    } else if boxedTextures.count > expectedCount {
+        boxedTextures = Array(boxedTextures.prefix(expectedCount))
+    }
+    let result = MTKTextureArrayBox(boxedTextures)
+    callback(userData, mtkTakeRetained(result), mtkNSErrorMessage(error as NSError?))
+}
+
+private func mtkCompleteTextureLoadWithMessage(
+    callback: MTKTextureLoaderRustCallback?,
+    userData: UnsafeMutableRawPointer?,
+    message: String
+) {
+    callback?(userData, nil, mtkDup(message))
+}
+
+private func mtkCompleteTextureArrayLoadWithMessage(
+    callback: MTKTextureLoaderRustArrayCallback?,
+    userData: UnsafeMutableRawPointer?,
+    message: String
+) {
+    callback?(userData, nil, mtkDup(message))
+}
+
 private func mtkTextureLoaderOptions(from rawPtr: UnsafeRawPointer?) -> [MTKTextureLoader.Option: Any]? {
     guard let rawPtr else { return nil }
     let raw = rawPtr.assumingMemoryBound(to: TextureLoaderOptionsRaw.self).pointee
@@ -145,6 +203,32 @@ public func mtk_texture_loader_new_texture_from_url(
     }
 }
 
+@_cdecl("mtk_texture_loader_new_texture_from_url_with_callback")
+public func mtk_texture_loader_new_texture_from_url_with_callback(
+    _ loaderPtr: UnsafeMutableRawPointer?,
+    _ path: UnsafePointer<CChar>?,
+    _ optionsPtr: UnsafeRawPointer?,
+    _ callback: MTKTextureLoaderRustCallback?,
+    _ userData: UnsafeMutableRawPointer?
+) {
+    guard let loader: MTKTextureLoader = mtkBorrow(loaderPtr, as: MTKTextureLoader.self),
+          let path
+    else {
+        mtkCompleteTextureLoadWithMessage(
+            callback: callback,
+            userData: userData,
+            message: "invalid MTKTextureLoader or path"
+        )
+        return
+    }
+
+    let options = mtkTextureLoaderOptions(from: optionsPtr)
+    let url = URL(fileURLWithPath: String(cString: path))
+    loader.newTexture(URL: url, options: options) { texture, error in
+        mtkCompleteTextureLoad(callback: callback, userData: userData, texture: texture, error: error)
+    }
+}
+
 @_cdecl("mtk_texture_loader_new_textures_from_urls")
 public func mtk_texture_loader_new_textures_from_urls(
     _ loaderPtr: UnsafeMutableRawPointer?,
@@ -181,6 +265,38 @@ public func mtk_texture_loader_new_textures_from_urls(
     return mtkTakeRetained(MTKTextureArrayBox(textures))
 }
 
+@_cdecl("mtk_texture_loader_new_textures_from_urls_with_callback")
+public func mtk_texture_loader_new_textures_from_urls_with_callback(
+    _ loaderPtr: UnsafeMutableRawPointer?,
+    _ paths: UnsafePointer<UnsafePointer<CChar>>?,
+    _ count: Int,
+    _ optionsPtr: UnsafeRawPointer?,
+    _ callback: MTKTextureLoaderRustArrayCallback?,
+    _ userData: UnsafeMutableRawPointer?
+) {
+    guard let loader: MTKTextureLoader = mtkBorrow(loaderPtr, as: MTKTextureLoader.self),
+          let urls = mtkTexturePaths(paths, count: count)
+    else {
+        mtkCompleteTextureArrayLoadWithMessage(
+            callback: callback,
+            userData: userData,
+            message: "invalid MTKTextureLoader or URL list"
+        )
+        return
+    }
+
+    let options = mtkTextureLoaderOptions(from: optionsPtr)
+    loader.newTextures(URLs: urls, options: options) { textures, error in
+        mtkCompleteTextureArrayLoad(
+            callback: callback,
+            userData: userData,
+            textures: textures,
+            expectedCount: urls.count,
+            error: error
+        )
+    }
+}
+
 @_cdecl("mtk_texture_loader_new_texture_named")
 public func mtk_texture_loader_new_texture_named(
     _ loaderPtr: UnsafeMutableRawPointer?,
@@ -211,6 +327,39 @@ public func mtk_texture_loader_new_texture_named(
     } catch let error as NSError {
         outError?.pointee = mtkNSErrorMessage(error)
         return nil
+    }
+}
+
+@_cdecl("mtk_texture_loader_new_texture_named_with_callback")
+public func mtk_texture_loader_new_texture_named_with_callback(
+    _ loaderPtr: UnsafeMutableRawPointer?,
+    _ name: UnsafePointer<CChar>?,
+    _ scaleFactor: Double,
+    _ bundlePath: UnsafePointer<CChar>?,
+    _ optionsPtr: UnsafeRawPointer?,
+    _ callback: MTKTextureLoaderRustCallback?,
+    _ userData: UnsafeMutableRawPointer?
+) {
+    guard let loader: MTKTextureLoader = mtkBorrow(loaderPtr, as: MTKTextureLoader.self),
+          let name
+    else {
+        mtkCompleteTextureLoadWithMessage(
+            callback: callback,
+            userData: userData,
+            message: "invalid MTKTextureLoader or texture name"
+        )
+        return
+    }
+
+    let options = mtkTextureLoaderOptions(from: optionsPtr)
+    let bundle = bundlePath.flatMap { Bundle(path: String(cString: $0)) }
+    loader.newTexture(
+        name: String(cString: name),
+        scaleFactor: CGFloat(scaleFactor),
+        bundle: bundle,
+        options: options
+    ) { texture, error in
+        mtkCompleteTextureLoad(callback: callback, userData: userData, texture: texture, error: error)
     }
 }
 
@@ -247,6 +396,42 @@ public func mtk_texture_loader_new_texture_named_with_display_gamut(
     } catch let error as NSError {
         outError?.pointee = mtkNSErrorMessage(error)
         return nil
+    }
+}
+
+@_cdecl("mtk_texture_loader_new_texture_named_with_display_gamut_with_callback")
+public func mtk_texture_loader_new_texture_named_with_display_gamut_with_callback(
+    _ loaderPtr: UnsafeMutableRawPointer?,
+    _ name: UnsafePointer<CChar>?,
+    _ scaleFactor: Double,
+    _ displayGamut: Int,
+    _ bundlePath: UnsafePointer<CChar>?,
+    _ optionsPtr: UnsafeRawPointer?,
+    _ callback: MTKTextureLoaderRustCallback?,
+    _ userData: UnsafeMutableRawPointer?
+) {
+    guard let loader: MTKTextureLoader = mtkBorrow(loaderPtr, as: MTKTextureLoader.self),
+          let name,
+          let gamut = NSDisplayGamut(rawValue: displayGamut)
+    else {
+        mtkCompleteTextureLoadWithMessage(
+            callback: callback,
+            userData: userData,
+            message: "invalid MTKTextureLoader, texture name, or display gamut"
+        )
+        return
+    }
+
+    let options = mtkTextureLoaderOptions(from: optionsPtr)
+    let bundle = bundlePath.flatMap { Bundle(path: String(cString: $0)) }
+    loader.newTexture(
+        name: String(cString: name),
+        scaleFactor: CGFloat(scaleFactor),
+        displayGamut: gamut,
+        bundle: bundle,
+        options: options
+    ) { texture, error in
+        mtkCompleteTextureLoad(callback: callback, userData: userData, texture: texture, error: error)
     }
 }
 
@@ -292,6 +477,46 @@ public func mtk_texture_loader_new_textures_named(
 
     outError?.pointee = mtkNSErrorMessage(firstError)
     return mtkTakeRetained(MTKTextureArrayBox(textures))
+}
+
+@_cdecl("mtk_texture_loader_new_textures_named_with_callback")
+public func mtk_texture_loader_new_textures_named_with_callback(
+    _ loaderPtr: UnsafeMutableRawPointer?,
+    _ names: UnsafePointer<UnsafePointer<CChar>>?,
+    _ count: Int,
+    _ scaleFactor: Double,
+    _ bundlePath: UnsafePointer<CChar>?,
+    _ optionsPtr: UnsafeRawPointer?,
+    _ callback: MTKTextureLoaderRustArrayCallback?,
+    _ userData: UnsafeMutableRawPointer?
+) {
+    guard let loader: MTKTextureLoader = mtkBorrow(loaderPtr, as: MTKTextureLoader.self),
+          let names = mtkStrings(names, count: count)
+    else {
+        mtkCompleteTextureArrayLoadWithMessage(
+            callback: callback,
+            userData: userData,
+            message: "invalid MTKTextureLoader or texture name list"
+        )
+        return
+    }
+
+    let options = mtkTextureLoaderOptions(from: optionsPtr)
+    let bundle = bundlePath.flatMap { Bundle(path: String(cString: $0)) }
+    loader.newTextures(
+        names: names,
+        scaleFactor: CGFloat(scaleFactor),
+        bundle: bundle,
+        options: options
+    ) { textures, error in
+        mtkCompleteTextureArrayLoad(
+            callback: callback,
+            userData: userData,
+            textures: textures,
+            expectedCount: names.count,
+            error: error
+        )
+    }
 }
 
 @_cdecl("mtk_texture_loader_new_textures_named_with_display_gamut")
@@ -341,6 +566,49 @@ public func mtk_texture_loader_new_textures_named_with_display_gamut(
     return mtkTakeRetained(MTKTextureArrayBox(textures))
 }
 
+@_cdecl("mtk_texture_loader_new_textures_named_with_display_gamut_with_callback")
+public func mtk_texture_loader_new_textures_named_with_display_gamut_with_callback(
+    _ loaderPtr: UnsafeMutableRawPointer?,
+    _ names: UnsafePointer<UnsafePointer<CChar>>?,
+    _ count: Int,
+    _ scaleFactor: Double,
+    _ displayGamut: Int,
+    _ bundlePath: UnsafePointer<CChar>?,
+    _ optionsPtr: UnsafeRawPointer?,
+    _ callback: MTKTextureLoaderRustArrayCallback?,
+    _ userData: UnsafeMutableRawPointer?
+) {
+    guard let loader: MTKTextureLoader = mtkBorrow(loaderPtr, as: MTKTextureLoader.self),
+          let names = mtkStrings(names, count: count),
+          let gamut = NSDisplayGamut(rawValue: displayGamut)
+    else {
+        mtkCompleteTextureArrayLoadWithMessage(
+            callback: callback,
+            userData: userData,
+            message: "invalid MTKTextureLoader, texture name list, or display gamut"
+        )
+        return
+    }
+
+    let options = mtkTextureLoaderOptions(from: optionsPtr)
+    let bundle = bundlePath.flatMap { Bundle(path: String(cString: $0)) }
+    loader.newTextures(
+        names: names,
+        scaleFactor: CGFloat(scaleFactor),
+        displayGamut: gamut,
+        bundle: bundle,
+        options: options
+    ) { textures, error in
+        mtkCompleteTextureArrayLoad(
+            callback: callback,
+            userData: userData,
+            textures: textures,
+            expectedCount: names.count,
+            error: error
+        )
+    }
+}
+
 @_cdecl("mtk_texture_loader_new_texture_from_data")
 public func mtk_texture_loader_new_texture_from_data(
     _ loaderPtr: UnsafeMutableRawPointer?,
@@ -363,6 +631,27 @@ public func mtk_texture_loader_new_texture_from_data(
     } catch let error as NSError {
         outError?.pointee = mtkNSErrorMessage(error)
         return nil
+    }
+}
+
+@_cdecl("mtk_texture_loader_new_texture_from_data_with_callback")
+public func mtk_texture_loader_new_texture_from_data_with_callback(
+    _ loaderPtr: UnsafeMutableRawPointer?,
+    _ bytes: UnsafeRawPointer?,
+    _ len: Int,
+    _ optionsPtr: UnsafeRawPointer?,
+    _ callback: MTKTextureLoaderRustCallback?,
+    _ userData: UnsafeMutableRawPointer?
+) {
+    guard let loader: MTKTextureLoader = mtkBorrow(loaderPtr, as: MTKTextureLoader.self) else {
+        mtkCompleteTextureLoadWithMessage(callback: callback, userData: userData, message: "invalid MTKTextureLoader")
+        return
+    }
+
+    let options = mtkTextureLoaderOptions(from: optionsPtr)
+    let data = len == 0 ? Data() : Data(bytes: bytes!, count: len)
+    loader.newTexture(data: data, options: options) { texture, error in
+        mtkCompleteTextureLoad(callback: callback, userData: userData, texture: texture, error: error)
     }
 }
 
@@ -393,6 +682,32 @@ public func mtk_texture_loader_new_texture_from_cgimage(
     }
 }
 
+@_cdecl("mtk_texture_loader_new_texture_from_cgimage_with_callback")
+public func mtk_texture_loader_new_texture_from_cgimage_with_callback(
+    _ loaderPtr: UnsafeMutableRawPointer?,
+    _ imagePtr: UnsafeMutableRawPointer?,
+    _ optionsPtr: UnsafeRawPointer?,
+    _ callback: MTKTextureLoaderRustCallback?,
+    _ userData: UnsafeMutableRawPointer?
+) {
+    guard let loader: MTKTextureLoader = mtkBorrow(loaderPtr, as: MTKTextureLoader.self),
+          let imagePtr
+    else {
+        mtkCompleteTextureLoadWithMessage(
+            callback: callback,
+            userData: userData,
+            message: "invalid MTKTextureLoader or CGImage"
+        )
+        return
+    }
+
+    let options = mtkTextureLoaderOptions(from: optionsPtr)
+    let image = Unmanaged<AnyObject>.fromOpaque(imagePtr).takeUnretainedValue() as! CGImage
+    loader.newTexture(cgImage: image, options: options) { texture, error in
+        mtkCompleteTextureLoad(callback: callback, userData: userData, texture: texture, error: error)
+    }
+}
+
 @_cdecl("mtk_texture_loader_new_texture_from_model_texture")
 public func mtk_texture_loader_new_texture_from_model_texture(
     _ loaderPtr: UnsafeMutableRawPointer?,
@@ -415,5 +730,35 @@ public func mtk_texture_loader_new_texture_from_model_texture(
     } catch let error as NSError {
         outError?.pointee = mtkNSErrorMessage(error)
         return nil
+    }
+}
+
+@_cdecl("mtk_texture_loader_new_texture_from_model_texture_with_callback")
+public func mtk_texture_loader_new_texture_from_model_texture_with_callback(
+    _ loaderPtr: UnsafeMutableRawPointer?,
+    _ texturePtr: UnsafeMutableRawPointer?,
+    _ optionsPtr: UnsafeRawPointer?,
+    _ callback: MTKTextureLoaderRustCallback?,
+    _ userData: UnsafeMutableRawPointer?
+) {
+    guard let loader: MTKTextureLoader = mtkBorrow(loaderPtr, as: MTKTextureLoader.self),
+          let texture: MDLTexture = mtkBorrow(texturePtr, as: MDLTexture.self)
+    else {
+        mtkCompleteTextureLoadWithMessage(
+            callback: callback,
+            userData: userData,
+            message: "invalid MTKTextureLoader or MDLTexture"
+        )
+        return
+    }
+
+    let options = mtkTextureLoaderOptions(from: optionsPtr)
+    loader.newTexture(texture: texture, options: options) { metalTexture, error in
+        mtkCompleteTextureLoad(
+            callback: callback,
+            userData: userData,
+            texture: metalTexture,
+            error: error
+        )
     }
 }

@@ -1,6 +1,6 @@
 [package]
 name = "metalkit-rs"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 homepage = "https://github.com/doom-fish/metalkit-rs"
@@ -45,8 +45,8 @@ cargo-clippy = []
 libc = "0.2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-apple-cf = { path = "../apple-cf-rs", version = ">=0.4.0, <0.6", features = ["cg"] }
-apple-metal = { path = "../apple-metal-rs", version = ">=0.5.0, <0.6" }
+apple-cf = { path = "../apple-cf-rs", version = ">=0.4.0, <0.7", features = ["cg"] }
+apple-metal = { path = "../apple-metal-rs", version = ">=0.5.0, <0.7" }
 
 [package.metadata.docs.rs]
 all-features = true

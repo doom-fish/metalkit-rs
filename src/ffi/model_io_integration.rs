@@ -87,4 +87,11 @@ unsafe extern "C" {
         options: *const super::texture_loader::TextureLoaderOptionsRaw,
         out_error: *mut *mut c_char,
     ) -> *mut c_void;
+    pub fn mtk_texture_loader_new_texture_from_model_texture_with_callback(
+        loader: *mut c_void,
+        texture: *mut c_void,
+        options: *const super::texture_loader::TextureLoaderOptionsRaw,
+        callback: Option<super::texture_loader::TextureLoaderCallback>,
+        user_data: *mut c_void,
+    );
 }

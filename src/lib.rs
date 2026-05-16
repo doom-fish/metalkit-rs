@@ -42,15 +42,16 @@ pub use model_io_integration::{
     model_error, model_io_vertex_descriptor_from_metal, model_io_vertex_format_from_metal,
     model_vertex_format, try_metal_vertex_descriptor_from_model_io,
     try_model_io_vertex_descriptor_from_metal, GeometryType, MetalVertexDescriptor, ModelAsset,
-    ModelMesh, ModelTexture, ModelVertexDescriptor, VertexDescriptorAttributeInfo,
+    ModelError, ModelMesh, ModelTexture, ModelVertexDescriptor, VertexDescriptorAttributeInfo,
     VertexDescriptorInfo, VertexDescriptorLayoutInfo,
 };
 pub use submesh::{IndexType, PrimitiveType, Submesh};
 pub use texture_loader::{
     texture_cpu_cache_mode, texture_loader_cube_layout, texture_loader_error,
     texture_loader_option, texture_loader_origin, DisplayGamut, TextureLoader,
-    TextureLoaderArrayOutcome, TextureLoaderCubeLayout, TextureLoaderOptionKey,
-    TextureLoaderOptions, TextureLoaderOrigin,
+    TextureLoaderArrayCallback, TextureLoaderArrayOutcome, TextureLoaderCallback,
+    TextureLoaderCubeLayout, TextureLoaderError, TextureLoaderOptionKey, TextureLoaderOptions,
+    TextureLoaderOrigin,
 };
 pub use view::{ClearColor, Rect, Size, View, ViewDelegate, ViewDelegateCallbacks};
 
@@ -58,8 +59,9 @@ pub mod prelude {
     pub use crate::{
         metal_vertex_descriptor_from_model_io, model_io_vertex_descriptor_from_metal, ClearColor,
         DisplayGamut, GeometryType, Mesh, MeshAssetConversion, MeshBuffer,
-        MeshBufferAllocator, MeshBufferType, ModelAsset, ModelMesh, ModelTexture,
+        MeshBufferAllocator, MeshBufferType, ModelAsset, ModelError, ModelMesh, ModelTexture,
         ModelVertexDescriptor, PrimitiveType, Rect, Size, Submesh, TextureLoader,
+        TextureLoaderArrayCallback, TextureLoaderCallback, TextureLoaderError,
         TextureLoaderOptions, View, ViewDelegate, ViewDelegateCallbacks,
     };
 }

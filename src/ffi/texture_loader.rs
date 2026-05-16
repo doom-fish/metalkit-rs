@@ -26,6 +26,11 @@ pub struct TextureLoaderOptionsRaw {
     pub origin: *const c_char,
 }
 
+pub type TextureLoaderCallback =
+    unsafe extern "C" fn(user_data: *mut c_void, texture: *mut c_void, error: *mut c_char);
+pub type TextureLoaderArrayCallback =
+    unsafe extern "C" fn(user_data: *mut c_void, result: *mut c_void, error: *mut c_char);
+
 unsafe extern "C" {
     pub fn mtk_texture_loader_new(device: *mut c_void) -> *mut c_void;
     pub fn mtk_texture_loader_device(loader: *mut c_void) -> *mut c_void;
@@ -35,6 +40,13 @@ unsafe extern "C" {
         options: *const TextureLoaderOptionsRaw,
         out_error: *mut *mut c_char,
     ) -> *mut c_void;
+    pub fn mtk_texture_loader_new_texture_from_url_with_callback(
+        loader: *mut c_void,
+        path: *const c_char,
+        options: *const TextureLoaderOptionsRaw,
+        callback: Option<TextureLoaderCallback>,
+        user_data: *mut c_void,
+    );
     pub fn mtk_texture_loader_new_textures_from_urls(
         loader: *mut c_void,
         paths: *const *const c_char,
@@ -42,6 +54,14 @@ unsafe extern "C" {
         options: *const TextureLoaderOptionsRaw,
         out_error: *mut *mut c_char,
     ) -> *mut c_void;
+    pub fn mtk_texture_loader_new_textures_from_urls_with_callback(
+        loader: *mut c_void,
+        paths: *const *const c_char,
+        count: usize,
+        options: *const TextureLoaderOptionsRaw,
+        callback: Option<TextureLoaderArrayCallback>,
+        user_data: *mut c_void,
+    );
     pub fn mtk_texture_array_count(result: *mut c_void) -> usize;
     pub fn mtk_texture_array_texture_at(result: *mut c_void, index: usize) -> *mut c_void;
     pub fn mtk_texture_loader_new_texture_named(
@@ -52,6 +72,15 @@ unsafe extern "C" {
         options: *const TextureLoaderOptionsRaw,
         out_error: *mut *mut c_char,
     ) -> *mut c_void;
+    pub fn mtk_texture_loader_new_texture_named_with_callback(
+        loader: *mut c_void,
+        name: *const c_char,
+        scale_factor: f64,
+        bundle_path: *const c_char,
+        options: *const TextureLoaderOptionsRaw,
+        callback: Option<TextureLoaderCallback>,
+        user_data: *mut c_void,
+    );
     pub fn mtk_texture_loader_new_texture_named_with_display_gamut(
         loader: *mut c_void,
         name: *const c_char,
@@ -61,6 +90,16 @@ unsafe extern "C" {
         options: *const TextureLoaderOptionsRaw,
         out_error: *mut *mut c_char,
     ) -> *mut c_void;
+    pub fn mtk_texture_loader_new_texture_named_with_display_gamut_with_callback(
+        loader: *mut c_void,
+        name: *const c_char,
+        scale_factor: f64,
+        display_gamut: usize,
+        bundle_path: *const c_char,
+        options: *const TextureLoaderOptionsRaw,
+        callback: Option<TextureLoaderCallback>,
+        user_data: *mut c_void,
+    );
     pub fn mtk_texture_loader_new_textures_named(
         loader: *mut c_void,
         names: *const *const c_char,
@@ -70,6 +109,16 @@ unsafe extern "C" {
         options: *const TextureLoaderOptionsRaw,
         out_error: *mut *mut c_char,
     ) -> *mut c_void;
+    pub fn mtk_texture_loader_new_textures_named_with_callback(
+        loader: *mut c_void,
+        names: *const *const c_char,
+        count: usize,
+        scale_factor: f64,
+        bundle_path: *const c_char,
+        options: *const TextureLoaderOptionsRaw,
+        callback: Option<TextureLoaderArrayCallback>,
+        user_data: *mut c_void,
+    );
     pub fn mtk_texture_loader_new_textures_named_with_display_gamut(
         loader: *mut c_void,
         names: *const *const c_char,
@@ -80,6 +129,17 @@ unsafe extern "C" {
         options: *const TextureLoaderOptionsRaw,
         out_error: *mut *mut c_char,
     ) -> *mut c_void;
+    pub fn mtk_texture_loader_new_textures_named_with_display_gamut_with_callback(
+        loader: *mut c_void,
+        names: *const *const c_char,
+        count: usize,
+        scale_factor: f64,
+        display_gamut: usize,
+        bundle_path: *const c_char,
+        options: *const TextureLoaderOptionsRaw,
+        callback: Option<TextureLoaderArrayCallback>,
+        user_data: *mut c_void,
+    );
     pub fn mtk_texture_loader_new_texture_from_data(
         loader: *mut c_void,
         bytes: *const c_void,
@@ -87,10 +147,25 @@ unsafe extern "C" {
         options: *const TextureLoaderOptionsRaw,
         out_error: *mut *mut c_char,
     ) -> *mut c_void;
+    pub fn mtk_texture_loader_new_texture_from_data_with_callback(
+        loader: *mut c_void,
+        bytes: *const c_void,
+        len: usize,
+        options: *const TextureLoaderOptionsRaw,
+        callback: Option<TextureLoaderCallback>,
+        user_data: *mut c_void,
+    );
     pub fn mtk_texture_loader_new_texture_from_cgimage(
         loader: *mut c_void,
         image: *mut c_void,
         options: *const TextureLoaderOptionsRaw,
         out_error: *mut *mut c_char,
     ) -> *mut c_void;
+    pub fn mtk_texture_loader_new_texture_from_cgimage_with_callback(
+        loader: *mut c_void,
+        image: *mut c_void,
+        options: *const TextureLoaderOptionsRaw,
+        callback: Option<TextureLoaderCallback>,
+        user_data: *mut c_void,
+    );
 }

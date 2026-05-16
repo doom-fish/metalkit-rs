@@ -2,8 +2,9 @@ mod common;
 
 use metalkit::{
     metal_vertex_descriptor_from_model_io, metal_vertex_format, metal_vertex_format_from_model_io,
-    model_io_vertex_descriptor_from_metal, model_io_vertex_format_from_metal, model_vertex_format,
-    MetalVertexDescriptor, ModelAsset, ModelTexture, ModelVertexDescriptor,
+    model_error, model_io_vertex_descriptor_from_metal, model_io_vertex_format_from_metal,
+    model_vertex_format, MetalVertexDescriptor, ModelAsset, ModelError, ModelTexture,
+    ModelVertexDescriptor,
 };
 
 #[test]
@@ -52,4 +53,6 @@ fn model_asset_texture_and_vertex_descriptor_helpers_work() {
 
     assert_eq!(model_io_vertex_format_from_metal(metal_vertex_format::FLOAT3), model_vertex_format::FLOAT3);
     assert_eq!(metal_vertex_format_from_model_io(model_vertex_format::FLOAT3), metal_vertex_format::FLOAT3);
+    assert_eq!(ModelError::DOMAIN.as_str(), model_error::DOMAIN);
+    assert_eq!(ModelError::KEY.as_str(), model_error::KEY);
 }

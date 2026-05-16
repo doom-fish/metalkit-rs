@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.1
+
+- Added `MTKTextureLoader` completion-handler wrappers for URL, named, `CGImage`, `MDLTexture`, data, and batch loading APIs via safe Rust callbacks
+- Added `TextureLoaderError`, `TextureLoaderCallback`, `TextureLoaderArrayCallback`, and `ModelError` wrappers for the remaining MetalKit string-enum and callback typealias surface
+- Expanded the texture-loader smoke example, integration tests, and coverage audit to validate the callback API and close the remaining header gaps
+
 ## 0.2.0
 
 - Added `MTKView` coverage with `View`, `ViewDelegate`, property accessors, delegate callbacks, and archive round-trip support

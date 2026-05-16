@@ -14,9 +14,30 @@ handle_type!(ModelTexture);
 handle_type!(MetalVertexDescriptor);
 handle_type!(ModelVertexDescriptor);
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ModelError(&'static str);
+
+impl ModelError {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        self.0
+    }
+}
+
+impl core::fmt::Display for ModelError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str(self.0)
+    }
+}
+
 pub mod model_error {
     pub const DOMAIN: &str = "MTKModelErrorDomain";
     pub const KEY: &str = "MTKModelErrorKey";
+}
+
+impl ModelError {
+    pub const DOMAIN: Self = Self(model_error::DOMAIN);
+    pub const KEY: Self = Self(model_error::KEY);
 }
 
 pub mod metal_vertex_format {
