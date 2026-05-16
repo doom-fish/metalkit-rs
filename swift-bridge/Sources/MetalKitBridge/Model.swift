@@ -4,126 +4,181 @@ import MetalKit
 import ModelIO
 import simd
 
-private func mtkMeshBufferType(from rawValue: Int) -> MDLMeshBufferType {
-    MDLMeshBufferType(rawValue: UInt(rawValue)) ?? .vertex
+private func mtkGeometryType(from rawValue: Int64) -> MDLGeometryType {
+    MDLGeometryType(rawValue: Int(rawValue)) ?? .triangles
 }
 
-private func mtkGeometryType(from rawValue: Int) -> MDLGeometryType {
-    MDLGeometryType(rawValue: rawValue) ?? .triangles
+private func mtkMetalVertexFormat(from rawValue: UInt) -> MTLVertexFormat {
+    MTLVertexFormat(rawValue: rawValue) ?? .invalid
 }
 
-@_cdecl("mtk_mesh_buffer_allocator_new")
-public func mtk_mesh_buffer_allocator_new(_ devicePtr: UnsafeMutableRawPointer?) -> UnsafeMutableRawPointer? {
-    guard let device: MTLDevice = mtkBorrow(devicePtr, as: MTLDevice.self) else {
-        return nil
+private func mtkModelVertexFormat(from rawValue: UInt) -> MDLVertexFormat {
+    MDLVertexFormat(rawValue: rawValue) ?? .invalid
+}
+
+private struct VertexDescriptorAttributeInfo: Encodable {
+    let index: Int
+    let format: UInt
+    let offset: Int
+    let bufferIndex: Int
+    let name: String?
+}
+
+private struct VertexDescriptorLayoutInfo: Encodable {
+    let index: Int
+    let stride: Int
+}
+
+private struct VertexDescriptorInfo: Encodable {
+    let attributes: [VertexDescriptorAttributeInfo]
+    let layouts: [VertexDescriptorLayoutInfo]
+}
+
+final class MTKMeshesFromAssetResultBox: NSObject {
+    let meshes: [MTKMesh]
+    let sourceMeshes: [MDLMesh]
+
+    init(meshes: [MTKMesh], sourceMeshes: [MDLMesh]) {
+        self.meshes = meshes
+        self.sourceMeshes = sourceMeshes
     }
-    return mtkTakeRetained(MTKMeshBufferAllocator(device: device))
 }
 
-@_cdecl("mtk_mesh_buffer_allocator_device")
-public func mtk_mesh_buffer_allocator_device(_ allocatorPtr: UnsafeMutableRawPointer?) -> UnsafeMutableRawPointer? {
-    guard let allocator: MTKMeshBufferAllocator = mtkBorrow(allocatorPtr, as: MTKMeshBufferAllocator.self) else {
-        return nil
+private func mtkModelVertexDescriptorInfo(_ descriptor: MDLVertexDescriptor) -> VertexDescriptorInfo {
+    var attributes: [VertexDescriptorAttributeInfo] = []
+    for index in 0..<descriptor.attributes.count {
+        guard let attribute = descriptor.attributes[index] as? MDLVertexAttribute,
+              attribute.format != .invalid
+        else {
+            continue
+        }
+        attributes.append(.init(
+            index: index,
+            format: UInt(attribute.format.rawValue),
+            offset: attribute.offset,
+            bufferIndex: attribute.bufferIndex,
+            name: attribute.name
+        ))
     }
-    return Unmanaged.passUnretained(allocator.device as AnyObject).toOpaque()
+
+    var layouts: [VertexDescriptorLayoutInfo] = []
+    for index in 0..<descriptor.layouts.count {
+        guard let layout = descriptor.layouts[index] as? MDLVertexBufferLayout,
+              layout.stride != 0
+        else {
+            continue
+        }
+        layouts.append(.init(index: index, stride: layout.stride))
+    }
+
+    return .init(attributes: attributes, layouts: layouts)
 }
 
-@_cdecl("mtk_mesh_buffer_allocator_new_buffer")
-public func mtk_mesh_buffer_allocator_new_buffer(
+private func mtkMetalVertexDescriptorInfo(_ descriptor: MTLVertexDescriptor) -> VertexDescriptorInfo {
+    var attributes: [VertexDescriptorAttributeInfo] = []
+    for index in 0..<31 {
+        guard let attribute = descriptor.attributes[index], attribute.format != .invalid else {
+            continue
+        }
+        attributes.append(.init(
+            index: index,
+            format: attribute.format.rawValue,
+            offset: attribute.offset,
+            bufferIndex: attribute.bufferIndex,
+            name: nil
+        ))
+    }
+
+    var layouts: [VertexDescriptorLayoutInfo] = []
+    for index in 0..<31 {
+        guard let layout = descriptor.layouts[index], layout.stride != 0 else {
+            continue
+        }
+        layouts.append(.init(index: index, stride: layout.stride))
+    }
+
+    return .init(attributes: attributes, layouts: layouts)
+}
+
+@_cdecl("mtk_model_asset_new")
+public func mtk_model_asset_new(_ allocatorPtr: UnsafeMutableRawPointer?) -> UnsafeMutableRawPointer? {
+    let allocator: MTKMeshBufferAllocator? = mtkBorrow(allocatorPtr, as: MTKMeshBufferAllocator.self)
+    return mtkTakeRetained(MDLAsset(bufferAllocator: allocator))
+}
+
+@_cdecl("mtk_model_asset_new_with_url")
+public func mtk_model_asset_new_with_url(
+    _ path: UnsafePointer<CChar>?,
+    _ vertexDescriptorPtr: UnsafeMutableRawPointer?,
     _ allocatorPtr: UnsafeMutableRawPointer?,
-    _ length: Int,
-    _ bufferType: Int
+    _ preserveTopology: Bool,
+    _ outError: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
 ) -> UnsafeMutableRawPointer? {
-    guard let allocator: MTKMeshBufferAllocator = mtkBorrow(allocatorPtr, as: MTKMeshBufferAllocator.self) else {
+    guard let path else {
+        outError?.pointee = mtkDup("invalid asset path")
         return nil
     }
-    let buffer = allocator.newBuffer(from: nil, length: length, type: mtkMeshBufferType(from: bufferType)) as? MTKMeshBuffer
-    return mtkTakeRetained(buffer)
+
+    let url = URL(fileURLWithPath: String(cString: path))
+    let vertexDescriptor: MDLVertexDescriptor? = mtkBorrow(vertexDescriptorPtr, as: MDLVertexDescriptor.self)
+    let allocator: MTKMeshBufferAllocator? = mtkBorrow(allocatorPtr, as: MTKMeshBufferAllocator.self)
+    var error: NSError?
+    let asset = MDLAsset(
+        url: url,
+        vertexDescriptor: vertexDescriptor,
+        bufferAllocator: allocator,
+        preserveTopology: preserveTopology,
+        error: &error
+    )
+    if let error {
+        outError?.pointee = mtkNSErrorMessage(error)
+        return nil
+    }
+    outError?.pointee = nil
+    return mtkTakeRetained(asset)
 }
 
-@_cdecl("mtk_mesh_buffer_allocator_new_buffer_with_data")
-public func mtk_mesh_buffer_allocator_new_buffer_with_data(
-    _ allocatorPtr: UnsafeMutableRawPointer?,
-    _ bytes: UnsafeRawPointer?,
-    _ len: Int,
-    _ bufferType: Int
+@_cdecl("mtk_model_asset_can_import_file_extension")
+public func mtk_model_asset_can_import_file_extension(_ pathExtension: UnsafePointer<CChar>?) -> Bool {
+    guard let pathExtension else { return false }
+    return MDLAsset.canImportFileExtension(String(cString: pathExtension))
+}
+
+@_cdecl("mtk_model_asset_count")
+public func mtk_model_asset_count(_ assetPtr: UnsafeMutableRawPointer?) -> Int {
+    guard let asset: MDLAsset = mtkBorrow(assetPtr, as: MDLAsset.self) else {
+        return 0
+    }
+    return asset.count
+}
+
+@_cdecl("mtk_model_asset_add_mesh")
+public func mtk_model_asset_add_mesh(
+    _ assetPtr: UnsafeMutableRawPointer?,
+    _ meshPtr: UnsafeMutableRawPointer?
+) -> Bool {
+    guard let asset: MDLAsset = mtkBorrow(assetPtr, as: MDLAsset.self),
+          let mesh: MDLMesh = mtkBorrow(meshPtr, as: MDLMesh.self)
+    else {
+        return false
+    }
+    asset.add(mesh)
+    return true
+}
+
+@_cdecl("mtk_model_asset_mesh_at")
+public func mtk_model_asset_mesh_at(
+    _ assetPtr: UnsafeMutableRawPointer?,
+    _ index: Int
 ) -> UnsafeMutableRawPointer? {
-    guard let allocator: MTKMeshBufferAllocator = mtkBorrow(allocatorPtr, as: MTKMeshBufferAllocator.self) else {
-        return nil
-    }
-    let data = len == 0 ? Data() : Data(bytes: bytes!, count: len)
-    let buffer = allocator.newBuffer(with: data, type: mtkMeshBufferType(from: bufferType)) as? MTKMeshBuffer
-    return mtkTakeRetained(buffer)
-}
-
-@_cdecl("mtk_mesh_buffer_length")
-public func mtk_mesh_buffer_length(_ bufferPtr: UnsafeMutableRawPointer?) -> Int {
-    guard let buffer: MTKMeshBuffer = mtkBorrow(bufferPtr, as: MTKMeshBuffer.self) else {
-        return 0
-    }
-    return buffer.length
-}
-
-@_cdecl("mtk_mesh_buffer_offset")
-public func mtk_mesh_buffer_offset(_ bufferPtr: UnsafeMutableRawPointer?) -> Int {
-    guard let buffer: MTKMeshBuffer = mtkBorrow(bufferPtr, as: MTKMeshBuffer.self) else {
-        return 0
-    }
-    return buffer.offset
-}
-
-@_cdecl("mtk_mesh_buffer_type")
-public func mtk_mesh_buffer_type(_ bufferPtr: UnsafeMutableRawPointer?) -> Int {
-    guard let buffer: MTKMeshBuffer = mtkBorrow(bufferPtr, as: MTKMeshBuffer.self) else {
-        return 0
-    }
-    return Int(buffer.type.rawValue)
-}
-
-@_cdecl("mtk_mesh_buffer_metal_buffer")
-public func mtk_mesh_buffer_metal_buffer(_ bufferPtr: UnsafeMutableRawPointer?) -> UnsafeMutableRawPointer? {
-    guard let buffer: MTKMeshBuffer = mtkBorrow(bufferPtr, as: MTKMeshBuffer.self) else {
-        return nil
-    }
-    return Unmanaged.passUnretained(buffer.buffer as AnyObject).toOpaque()
-}
-
-@_cdecl("mtk_mesh_buffer_copy_bytes")
-public func mtk_mesh_buffer_copy_bytes(
-    _ bufferPtr: UnsafeMutableRawPointer?,
-    _ dst: UnsafeMutableRawPointer?,
-    _ len: Int
-) -> Int {
-    guard let buffer: MTKMeshBuffer = mtkBorrow(bufferPtr, as: MTKMeshBuffer.self),
-          let dst,
-          len > 0
+    guard let asset: MDLAsset = mtkBorrow(assetPtr, as: MDLAsset.self),
+          index >= 0,
+          index < asset.count,
+          let mesh = asset.object(at: index) as? MDLMesh
     else {
-        return 0
-    }
-
-    let contents = buffer.buffer.contents()
-    let available = max(0, buffer.length - buffer.offset)
-    let count = min(len, available)
-    memcpy(dst, contents.advanced(by: buffer.offset), count)
-    return count
-}
-
-@_cdecl("mtk_mesh_buffer_get_name")
-public func mtk_mesh_buffer_get_name(_ bufferPtr: UnsafeMutableRawPointer?) -> UnsafeMutablePointer<CChar>? {
-    guard let buffer: MTKMeshBuffer = mtkBorrow(bufferPtr, as: MTKMeshBuffer.self) else {
         return nil
     }
-    return mtkDup(buffer.name)
-}
-
-@_cdecl("mtk_mesh_buffer_set_name")
-public func mtk_mesh_buffer_set_name(_ bufferPtr: UnsafeMutableRawPointer?, _ name: UnsafePointer<CChar>?) {
-    guard let buffer: MTKMeshBuffer = mtkBorrow(bufferPtr, as: MTKMeshBuffer.self),
-          let name
-    else {
-        return
-    }
-    buffer.name = String(cString: name)
+    return mtkTakeRetained(mesh)
 }
 
 @_cdecl("mtk_model_mesh_new_box")
@@ -148,7 +203,7 @@ public func mtk_model_mesh_new_box(
         boxWithExtent: SIMD3<Float>(extentX, extentY, extentZ),
         segments: SIMD3<UInt32>(segmentsX, segmentsY, segmentsZ),
         inwardNormals: inwardNormals,
-        geometryType: mtkGeometryType(from: Int(geometryType)),
+        geometryType: mtkGeometryType(from: geometryType),
         allocator: allocator
     )
     outError?.pointee = nil
@@ -181,145 +236,200 @@ public func mtk_model_mesh_set_name(_ meshPtr: UnsafeMutableRawPointer?, _ name:
     mesh.name = String(cString: name)
 }
 
-@_cdecl("mtk_mesh_new_from_model_mesh")
-public func mtk_mesh_new_from_model_mesh(
-    _ meshPtr: UnsafeMutableRawPointer?,
-    _ devicePtr: UnsafeMutableRawPointer?,
+@_cdecl("mtk_model_texture_new_from_url")
+public func mtk_model_texture_new_from_url(
+    _ path: UnsafePointer<CChar>?,
+    _ name: UnsafePointer<CChar>?,
     _ outError: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
 ) -> UnsafeMutableRawPointer? {
-    guard let mesh: MDLMesh = mtkBorrow(meshPtr, as: MDLMesh.self),
-          let device: MTLDevice = mtkBorrow(devicePtr, as: MTLDevice.self)
+    guard let path else {
+        outError?.pointee = mtkDup("invalid texture path")
+        return nil
+    }
+    let url = URL(fileURLWithPath: String(cString: path))
+    if !FileManager.default.fileExists(atPath: url.path) {
+        outError?.pointee = mtkDup("texture path does not exist")
+        return nil
+    }
+    let texture = MDLURLTexture(url: url, name: name.map { String(cString: $0) })
+    outError?.pointee = nil
+    return mtkTakeRetained(texture)
+}
+
+@_cdecl("mtk_metal_vertex_descriptor_new")
+public func mtk_metal_vertex_descriptor_new() -> UnsafeMutableRawPointer? {
+    mtkTakeRetained(MTLVertexDescriptor())
+}
+
+@_cdecl("mtk_metal_vertex_descriptor_set_attribute")
+public func mtk_metal_vertex_descriptor_set_attribute(
+    _ descriptorPtr: UnsafeMutableRawPointer?,
+    _ index: Int,
+    _ format: UInt,
+    _ offset: Int,
+    _ bufferIndex: Int
+) -> Bool {
+    guard let descriptor: MTLVertexDescriptor = mtkBorrow(descriptorPtr, as: MTLVertexDescriptor.self),
+          (0..<31).contains(index),
+          (0..<31).contains(bufferIndex)
     else {
-        outError?.pointee = mtkDup("invalid MDLMesh or MTLDevice")
-        return nil
+        return false
     }
-
-    do {
-        let metalMesh = try MTKMesh(mesh: mesh, device: device)
-        outError?.pointee = nil
-        return mtkTakeRetained(metalMesh)
-    } catch let error as NSError {
-        outError?.pointee = mtkNSErrorMessage(error)
-        return nil
+    guard let attribute = descriptor.attributes[index] else {
+        return false
     }
+    attribute.format = mtkMetalVertexFormat(from: format)
+    attribute.offset = offset
+    attribute.bufferIndex = bufferIndex
+    return true
 }
 
-@_cdecl("mtk_mesh_vertex_count")
-public func mtk_mesh_vertex_count(_ meshPtr: UnsafeMutableRawPointer?) -> Int {
-    guard let mesh: MTKMesh = mtkBorrow(meshPtr, as: MTKMesh.self) else {
-        return 0
+@_cdecl("mtk_metal_vertex_descriptor_set_layout")
+public func mtk_metal_vertex_descriptor_set_layout(
+    _ descriptorPtr: UnsafeMutableRawPointer?,
+    _ index: Int,
+    _ stride: Int
+) -> Bool {
+    guard let descriptor: MTLVertexDescriptor = mtkBorrow(descriptorPtr, as: MTLVertexDescriptor.self),
+          (0..<31).contains(index)
+    else {
+        return false
     }
-    return mesh.vertexCount
+    descriptor.layouts[index].stride = stride
+    return true
 }
 
-@_cdecl("mtk_mesh_get_name")
-public func mtk_mesh_get_name(_ meshPtr: UnsafeMutableRawPointer?) -> UnsafeMutablePointer<CChar>? {
-    guard let mesh: MTKMesh = mtkBorrow(meshPtr, as: MTKMesh.self) else {
+@_cdecl("mtk_metal_vertex_descriptor_info_json")
+public func mtk_metal_vertex_descriptor_info_json(
+    _ descriptorPtr: UnsafeMutableRawPointer?
+) -> UnsafeMutablePointer<CChar>? {
+    guard let descriptor: MTLVertexDescriptor = mtkBorrow(descriptorPtr, as: MTLVertexDescriptor.self) else {
         return nil
     }
-    return mtkDup(mesh.name)
+    return mtkJSON(mtkMetalVertexDescriptorInfo(descriptor))
 }
 
-@_cdecl("mtk_mesh_set_name")
-public func mtk_mesh_set_name(_ meshPtr: UnsafeMutableRawPointer?, _ name: UnsafePointer<CChar>?) {
-    guard let mesh: MTKMesh = mtkBorrow(meshPtr, as: MTKMesh.self),
+@_cdecl("mtk_model_vertex_descriptor_new")
+public func mtk_model_vertex_descriptor_new() -> UnsafeMutableRawPointer? {
+    mtkTakeRetained(MDLVertexDescriptor())
+}
+
+@_cdecl("mtk_model_vertex_descriptor_set_attribute")
+public func mtk_model_vertex_descriptor_set_attribute(
+    _ descriptorPtr: UnsafeMutableRawPointer?,
+    _ index: Int,
+    _ name: UnsafePointer<CChar>?,
+    _ format: UInt,
+    _ offset: Int,
+    _ bufferIndex: Int
+) -> Bool {
+    guard let descriptor: MDLVertexDescriptor = mtkBorrow(descriptorPtr, as: MDLVertexDescriptor.self),
+          index >= 0,
+          bufferIndex >= 0,
           let name
     else {
-        return
+        return false
     }
-    mesh.name = String(cString: name)
+    while descriptor.attributes.count <= index {
+        descriptor.attributes.add(NSNull())
+    }
+    descriptor.attributes[index] = MDLVertexAttribute(
+        name: String(cString: name),
+        format: mtkModelVertexFormat(from: format),
+        offset: offset,
+        bufferIndex: bufferIndex
+    )
+    return true
 }
 
-@_cdecl("mtk_mesh_vertex_buffer_count")
-public func mtk_mesh_vertex_buffer_count(_ meshPtr: UnsafeMutableRawPointer?) -> Int {
-    guard let mesh: MTKMesh = mtkBorrow(meshPtr, as: MTKMesh.self) else {
-        return 0
+@_cdecl("mtk_model_vertex_descriptor_set_layout")
+public func mtk_model_vertex_descriptor_set_layout(
+    _ descriptorPtr: UnsafeMutableRawPointer?,
+    _ index: Int,
+    _ stride: Int
+) -> Bool {
+    guard let descriptor: MDLVertexDescriptor = mtkBorrow(descriptorPtr, as: MDLVertexDescriptor.self),
+          index >= 0
+    else {
+        return false
     }
-    return mesh.vertexBuffers.count
+    while descriptor.layouts.count <= index {
+        descriptor.layouts.add(NSNull())
+    }
+    descriptor.layouts[index] = MDLVertexBufferLayout(stride: stride)
+    return true
 }
 
-@_cdecl("mtk_mesh_vertex_buffer_at")
-public func mtk_mesh_vertex_buffer_at(
-    _ meshPtr: UnsafeMutableRawPointer?,
-    _ index: Int
+@_cdecl("mtk_model_vertex_descriptor_info_json")
+public func mtk_model_vertex_descriptor_info_json(
+    _ descriptorPtr: UnsafeMutableRawPointer?
+) -> UnsafeMutablePointer<CChar>? {
+    guard let descriptor: MDLVertexDescriptor = mtkBorrow(descriptorPtr, as: MDLVertexDescriptor.self) else {
+        return nil
+    }
+    return mtkJSON(mtkModelVertexDescriptorInfo(descriptor))
+}
+
+@_cdecl("mtk_model_io_vertex_descriptor_from_metal")
+public func mtk_model_io_vertex_descriptor_from_metal(
+    _ descriptorPtr: UnsafeMutableRawPointer?
 ) -> UnsafeMutableRawPointer? {
-    guard let mesh: MTKMesh = mtkBorrow(meshPtr, as: MTKMesh.self),
-          index >= 0,
-          index < mesh.vertexBuffers.count
-    else {
+    guard let descriptor: MTLVertexDescriptor = mtkBorrow(descriptorPtr, as: MTLVertexDescriptor.self) else {
         return nil
     }
-    return mtkTakeRetained(mesh.vertexBuffers[index])
+    return mtkTakeRetained(MTKModelIOVertexDescriptorFromMetal(descriptor))
 }
 
-@_cdecl("mtk_mesh_submesh_count")
-public func mtk_mesh_submesh_count(_ meshPtr: UnsafeMutableRawPointer?) -> Int {
-    guard let mesh: MTKMesh = mtkBorrow(meshPtr, as: MTKMesh.self) else {
-        return 0
-    }
-    return mesh.submeshes.count
-}
-
-@_cdecl("mtk_mesh_submesh_at")
-public func mtk_mesh_submesh_at(
-    _ meshPtr: UnsafeMutableRawPointer?,
-    _ index: Int
+@_cdecl("mtk_model_io_vertex_descriptor_from_metal_with_error")
+public func mtk_model_io_vertex_descriptor_from_metal_with_error(
+    _ descriptorPtr: UnsafeMutableRawPointer?,
+    _ outError: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
 ) -> UnsafeMutableRawPointer? {
-    guard let mesh: MTKMesh = mtkBorrow(meshPtr, as: MTKMesh.self),
-          index >= 0,
-          index < mesh.submeshes.count
-    else {
+    guard let descriptor: MTLVertexDescriptor = mtkBorrow(descriptorPtr, as: MTLVertexDescriptor.self) else {
+        outError?.pointee = mtkDup("invalid MTLVertexDescriptor")
         return nil
     }
-    return mtkTakeRetained(mesh.submeshes[index])
+    let result = MTKModelIOVertexDescriptorFromMetal(descriptor)
+    outError?.pointee = nil
+    return mtkTakeRetained(result)
 }
 
-@_cdecl("mtk_submesh_primitive_type")
-public func mtk_submesh_primitive_type(_ submeshPtr: UnsafeMutableRawPointer?) -> Int {
-    guard let submesh: MTKSubmesh = mtkBorrow(submeshPtr, as: MTKSubmesh.self) else {
-        return 0
-    }
-    return Int(submesh.primitiveType.rawValue)
-}
-
-@_cdecl("mtk_submesh_index_type")
-public func mtk_submesh_index_type(_ submeshPtr: UnsafeMutableRawPointer?) -> Int {
-    guard let submesh: MTKSubmesh = mtkBorrow(submeshPtr, as: MTKSubmesh.self) else {
-        return 0
-    }
-    return Int(submesh.indexType.rawValue)
-}
-
-@_cdecl("mtk_submesh_index_buffer")
-public func mtk_submesh_index_buffer(_ submeshPtr: UnsafeMutableRawPointer?) -> UnsafeMutableRawPointer? {
-    guard let submesh: MTKSubmesh = mtkBorrow(submeshPtr, as: MTKSubmesh.self) else {
+@_cdecl("mtk_metal_vertex_descriptor_from_model_io")
+public func mtk_metal_vertex_descriptor_from_model_io(
+    _ descriptorPtr: UnsafeMutableRawPointer?
+) -> UnsafeMutableRawPointer? {
+    guard let descriptor: MDLVertexDescriptor = mtkBorrow(descriptorPtr, as: MDLVertexDescriptor.self) else {
         return nil
     }
-    return mtkTakeRetained(submesh.indexBuffer)
-}
-
-@_cdecl("mtk_submesh_index_count")
-public func mtk_submesh_index_count(_ submeshPtr: UnsafeMutableRawPointer?) -> Int {
-    guard let submesh: MTKSubmesh = mtkBorrow(submeshPtr, as: MTKSubmesh.self) else {
-        return 0
-    }
-    return submesh.indexCount
-}
-
-@_cdecl("mtk_submesh_get_name")
-public func mtk_submesh_get_name(_ submeshPtr: UnsafeMutableRawPointer?) -> UnsafeMutablePointer<CChar>? {
-    guard let submesh: MTKSubmesh = mtkBorrow(submeshPtr, as: MTKSubmesh.self) else {
+    guard let result = MTKMetalVertexDescriptorFromModelIO(descriptor) else {
         return nil
     }
-    return mtkDup(submesh.name)
+    return mtkTakeRetained(result)
 }
 
-@_cdecl("mtk_submesh_set_name")
-public func mtk_submesh_set_name(_ submeshPtr: UnsafeMutableRawPointer?, _ name: UnsafePointer<CChar>?) {
-    guard let submesh: MTKSubmesh = mtkBorrow(submeshPtr, as: MTKSubmesh.self),
-          let name
-    else {
-        return
+@_cdecl("mtk_metal_vertex_descriptor_from_model_io_with_error")
+public func mtk_metal_vertex_descriptor_from_model_io_with_error(
+    _ descriptorPtr: UnsafeMutableRawPointer?,
+    _ outError: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
+) -> UnsafeMutableRawPointer? {
+    guard let descriptor: MDLVertexDescriptor = mtkBorrow(descriptorPtr, as: MDLVertexDescriptor.self) else {
+        outError?.pointee = mtkDup("invalid MDLVertexDescriptor")
+        return nil
     }
-    submesh.name = String(cString: name)
+    guard let result = MTKMetalVertexDescriptorFromModelIO(descriptor) else {
+        outError?.pointee = mtkDup("failed to convert MDLVertexDescriptor to MTLVertexDescriptor")
+        return nil
+    }
+    outError?.pointee = nil
+    return mtkTakeRetained(result)
+}
+
+@_cdecl("mtk_model_io_vertex_format_from_metal")
+public func mtk_model_io_vertex_format_from_metal(_ vertexFormat: UInt) -> UInt {
+    UInt(MTKModelIOVertexFormatFromMetal(mtkMetalVertexFormat(from: vertexFormat)).rawValue)
+}
+
+@_cdecl("mtk_metal_vertex_format_from_model_io")
+public func mtk_metal_vertex_format_from_model_io(_ vertexFormat: UInt) -> UInt {
+    MTKMetalVertexFormatFromModelIO(mtkModelVertexFormat(from: vertexFormat)).rawValue
 }

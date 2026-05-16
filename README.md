@@ -1,8 +1,24 @@
 # metalkit-rs
 
-Safe Rust bindings for Apple's [MetalKit](https://developer.apple.com/documentation/metalkit) framework on macOS.
+Safe `Rust` bindings for Apple's [`MetalKit`](https://developer.apple.com/documentation/metalkit) framework on `macOS`.
 
-> **Status:** v0.1.0 covers `MTKTextureLoader`, the core texture-loader option constants, and the `MTKMesh` / `MTKSubmesh` / `MTKMeshBuffer` / `MTKMeshBufferAllocator` bridge used with Model I/O meshes.
+> **Status:** v0.2.0 expands the crate across `MTKView`, `MTKTextureLoader`, `MTKMesh`, `MTKMeshBuffer`, `MTKSubmesh`, `MTKMeshBufferAllocator`, and `Model I/O` integration helpers used by `MTKModel.h`.
+
+## What v0.2.0 covers
+
+- `View` + `ViewDelegate` wrappers for `MTKView`
+- `TextureLoader` sync loading from URLs, data, `CGImage`, `MDLTexture`, and named-texture failure handling helpers
+- `MeshBufferAllocator`, `MeshBuffer`, `Submesh`, and `Mesh` wrappers for `MetalKit` mesh bridging
+- `ModelAsset`, `ModelMesh`, `ModelTexture`, and vertex-descriptor conversion helpers for `Model I/O` integration
+- Raw-pointer accessors for `Metal` types that `apple-metal-rs` does not wrap yet (`CAMetalDrawable`, render-pass descriptors, preferred device)
+
+See [`COVERAGE.md`](COVERAGE.md) for the audited header-level checklist.
+
+## Requirements
+
+- `macOS`
+- Xcode command-line tools / `Swift` toolchain
+- `Rust` 1.76+
 
 ## Quick start
 
@@ -25,26 +41,27 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-## Highlights
-
-- `TextureLoader` for loading Metal textures from URLs, asset names, `Data`, and `CGImage`
-- `TextureLoaderOptions` for `generateMipmaps`, `allocateMipmaps`, `SRGB`, `textureUsage`, `textureStorageMode`, and `textureCPUCacheMode`
-- `MeshBufferAllocator` and `ModelMesh` helpers for building Model I/O meshes backed by Metal buffers
-- `Mesh`, `Submesh`, and `MeshBuffer` wrappers for the `MetalKit` rendering bridge
-
-## Smoke examples
-
-Run the texture-loader smoke test with:
+## Examples
 
 ```bash
 cargo run --example 01_texture_loader_smoke
+cargo run --example 02_mesh_bridge_smoke
+cargo run --example 03_model_io_integration_smoke
+cargo run --example 04_mesh_buffer_allocator_smoke
+cargo run --example 05_view_smoke
 ```
 
-Run the Model I/O mesh bridge smoke test with:
+## Validation
 
 ```bash
-cargo run --example 02_mesh_bridge_smoke
+cargo clippy --all-targets -- -D warnings
+cargo test
 ```
+
+## Notes
+
+- `MTKView` render-pass descriptors and drawables are exposed as raw pointers for now because `apple-metal-rs` does not yet ship typed wrappers for those `Metal` objects.
+- The `TextureLoader` surface focuses on the synchronous APIs; see [`COVERAGE.md`](COVERAGE.md) for the exact audit status of completion-handler variants.
 
 ## License
 

@@ -1,3 +1,5 @@
+use crate::error::MetalKitError;
+use serde::de::DeserializeOwned;
 use std::ffi::CString;
 use std::os::unix::ffi::OsStrExt;
 use std::path::Path;
@@ -62,10 +64,40 @@ macro_rules! handle_type {
 
 pub(crate) use handle_type;
 
-pub fn cstring_from_str(value: &str) -> Option<CString> {
+pub(crate) fn cstring_from_str(value: &str) -> Option<CString> {
     CString::new(value).ok()
 }
 
-pub fn cstring_from_path(path: &Path) -> Option<CString> {
+pub(crate) fn cstring_from_path(path: &Path) -> Option<CString> {
     CString::new(path.as_os_str().as_bytes()).ok()
+}
+
+pub(crate) fn take_c_string(ptr: *mut libc::c_char) -> Option<String> {
+    if ptr.is_null() {
+        return None;
+    }
+
+    let value = unsafe { std::ffi::CStr::from_ptr(ptr) }
+        .to_string_lossy()
+        .into_owned();
+    unsafe { libc::free(ptr.cast()) };
+    Some(value)
+}
+
+pub(crate) fn take_error(ptr: *mut libc::c_char, fallback_message: &str) -> MetalKitError {
+    take_c_string(ptr).map_or_else(
+        || MetalKitError::new(fallback_message),
+        MetalKitError::new,
+    )
+}
+
+pub(crate) fn parse_json<T: DeserializeOwned>(
+    ptr: *mut libc::c_char,
+    type_name: &str,
+) -> Result<T, MetalKitError> {
+    let json = take_c_string(ptr)
+        .ok_or_else(|| MetalKitError::new(format!("missing {type_name} JSON payload")))?;
+    serde_json::from_str(&json).map_err(|err| {
+        MetalKitError::new(format!("failed to parse {type_name} JSON: {err}"))
+    })
 }

@@ -1,11 +1,11 @@
 [package]
 name = "metalkit-rs"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 homepage = "https://github.com/doom-fish/metalkit-rs"
 repository = "https://github.com/doom-fish/metalkit-rs"
-description = "Safe Rust bindings for Apple's MetalKit framework — texture loading and Model I/O mesh bridging on macOS"
+description = "Safe Rust bindings for Apple's MetalKit framework — MTKView, texture loading, Model I/O integration, and mesh bridging on macOS"
 authors = ["Per Johansson <per@doom.fish>"]
 keywords = ["metalkit", "metal", "modelio", "macos", "apple"]
 categories = ["api-bindings", "graphics", "os::macos-apis"]
@@ -15,13 +15,15 @@ build = "build.rs"
 include = [
     "src/**/*",
     "examples/**/*",
+    "tests/**/*",
     "swift-bridge/Package.swift",
     "swift-bridge/Sources/**/*",
     "build.rs",
     "Cargo.toml",
     "README.md",
-    "LICENSE-*",
     "CHANGELOG.md",
+    "COVERAGE.md",
+    "LICENSE-*",
 ]
 
 [lints.rust]
@@ -41,6 +43,8 @@ cargo-clippy = []
 
 [dependencies]
 libc = "0.2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 apple-cf = { path = "../apple-cf-rs", version = ">=0.4.0, <0.6", features = ["cg"] }
 apple-metal = { path = "../apple-metal-rs", version = ">=0.5.0, <0.6" }
 
@@ -52,12 +56,6 @@ rustdoc-args = ["--cfg", "docsrs"]
 
 [badges]
 maintenance = { status = "actively-developed" }
-
-[[example]]
-name = "01_texture_loader_smoke"
-
-[[example]]
-name = "02_mesh_bridge_smoke"
 
 [profile.release]
 debug = "full"

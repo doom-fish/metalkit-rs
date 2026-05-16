@@ -1,23 +1,24 @@
 import Foundation
 import MetalKit
 
-private struct TextureLoaderOptionsRaw {
-    var flags: UInt32
-    var generateMipmaps: UInt8
-    var allocateMipmaps: UInt8
-    var srgb: UInt8
-    var reserved: UInt8
-    var textureUsage: UInt64
-    var textureStorageMode: UInt64
-    var textureCPUCacheMode: UInt64
+struct MTKRectRaw {
+    var x: Double
+    var y: Double
+    var width: Double
+    var height: Double
 }
 
-private let optionGenerateMipmaps: UInt32 = 1 << 0
-private let optionAllocateMipmaps: UInt32 = 1 << 1
-private let optionSRGB: UInt32 = 1 << 2
-private let optionTextureUsage: UInt32 = 1 << 3
-private let optionTextureStorageMode: UInt32 = 1 << 4
-private let optionTextureCPUCacheMode: UInt32 = 1 << 5
+struct MTKSizeRaw {
+    var width: Double
+    var height: Double
+}
+
+struct MTKClearColorRaw {
+    var red: Double
+    var green: Double
+    var blue: Double
+    var alpha: Double
+}
 
 func mtkRetain(_ ptr: UnsafeMutableRawPointer?) -> UnsafeMutableRawPointer? {
     guard let ptr else { return nil }
@@ -50,31 +51,25 @@ func mtkNSErrorMessage(_ error: NSError?) -> UnsafeMutablePointer<CChar>? {
     return mtkDup("\(error.domain)(\(error.code)): \(error.localizedDescription)")
 }
 
-func mtkTextureLoaderOptions(from rawPtr: UnsafeRawPointer?) -> [MTKTextureLoader.Option: Any]? {
-    guard let rawPtr else { return nil }
-    let raw = rawPtr.assumingMemoryBound(to: TextureLoaderOptionsRaw.self).pointee
-    var options: [MTKTextureLoader.Option: Any] = [:]
+func mtkStrings(
+    _ items: UnsafePointer<UnsafePointer<CChar>>?,
+    count: Int
+) -> [String]? {
+    if count == 0 {
+        return []
+    }
+    guard let items else { return nil }
+    return (0..<count).map { String(cString: items[$0]) }
+}
 
-    if raw.flags & optionGenerateMipmaps != 0 {
-        options[.generateMipmaps] = raw.generateMipmaps != 0
+func mtkJSON<T: Encodable>(_ value: T) -> UnsafeMutablePointer<CChar>? {
+    do {
+        let data = try JSONEncoder().encode(value)
+        let string = String(decoding: data, as: UTF8.self)
+        return strdup(string)
+    } catch {
+        return mtkDup("failed to encode JSON: \(error)")
     }
-    if raw.flags & optionAllocateMipmaps != 0 {
-        options[.allocateMipmaps] = raw.allocateMipmaps != 0
-    }
-    if raw.flags & optionSRGB != 0 {
-        options[.SRGB] = raw.srgb != 0
-    }
-    if raw.flags & optionTextureUsage != 0 {
-        options[.textureUsage] = NSNumber(value: raw.textureUsage)
-    }
-    if raw.flags & optionTextureStorageMode != 0 {
-        options[.textureStorageMode] = NSNumber(value: raw.textureStorageMode)
-    }
-    if raw.flags & optionTextureCPUCacheMode != 0 {
-        options[.textureCPUCacheMode] = NSNumber(value: raw.textureCPUCacheMode)
-    }
-
-    return options.isEmpty ? nil : options
 }
 
 @_cdecl("mtk_retain")

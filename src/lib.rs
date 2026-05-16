@@ -24,23 +24,42 @@
 
 mod error;
 pub mod ffi;
-mod model;
+mod mesh;
+mod mesh_buffer;
+mod mesh_buffer_allocator;
+mod model_io_integration;
 mod private;
-mod texture;
+mod submesh;
+mod texture_loader;
+mod view;
 
 pub use error::MetalKitError;
-pub use model::{
-    GeometryType, IndexType, Mesh, MeshBuffer, MeshBufferAllocator, MeshBufferType, ModelMesh,
-    PrimitiveType, Submesh,
+pub use mesh::{Mesh, MeshAssetConversion};
+pub use mesh_buffer::{MeshBuffer, MeshBufferType, MeshBufferZone};
+pub use mesh_buffer_allocator::MeshBufferAllocator;
+pub use model_io_integration::{
+    metal_vertex_descriptor_from_model_io, metal_vertex_format, metal_vertex_format_from_model_io,
+    model_error, model_io_vertex_descriptor_from_metal, model_io_vertex_format_from_metal,
+    model_vertex_format, try_metal_vertex_descriptor_from_model_io,
+    try_model_io_vertex_descriptor_from_metal, GeometryType, MetalVertexDescriptor, ModelAsset,
+    ModelMesh, ModelTexture, ModelVertexDescriptor, VertexDescriptorAttributeInfo,
+    VertexDescriptorInfo, VertexDescriptorLayoutInfo,
 };
-pub use texture::{
-    texture_cpu_cache_mode, texture_loader_option, TextureLoader, TextureLoaderOptionKey,
-    TextureLoaderOptions,
+pub use submesh::{IndexType, PrimitiveType, Submesh};
+pub use texture_loader::{
+    texture_cpu_cache_mode, texture_loader_cube_layout, texture_loader_error,
+    texture_loader_option, texture_loader_origin, DisplayGamut, TextureLoader,
+    TextureLoaderArrayOutcome, TextureLoaderCubeLayout, TextureLoaderOptionKey,
+    TextureLoaderOptions, TextureLoaderOrigin,
 };
+pub use view::{ClearColor, Rect, Size, View, ViewDelegate, ViewDelegateCallbacks};
 
 pub mod prelude {
     pub use crate::{
-        GeometryType, Mesh, MeshBuffer, MeshBufferAllocator, MeshBufferType, ModelMesh, Submesh,
-        TextureLoader, TextureLoaderOptions,
+        metal_vertex_descriptor_from_model_io, model_io_vertex_descriptor_from_metal, ClearColor,
+        DisplayGamut, GeometryType, Mesh, MeshAssetConversion, MeshBuffer,
+        MeshBufferAllocator, MeshBufferType, ModelAsset, ModelMesh, ModelTexture,
+        ModelVertexDescriptor, PrimitiveType, Rect, Size, Submesh, TextureLoader,
+        TextureLoaderOptions, View, ViewDelegate, ViewDelegateCallbacks,
     };
 }
