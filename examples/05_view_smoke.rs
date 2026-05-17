@@ -43,10 +43,19 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     assert_eq!(*draw_count.lock().expect("draw count"), 1);
     assert_eq!(view.color_pixel_format(), pixel_format::BGRA8UNORM_SRGB);
-    assert_eq!(view.drawable_size(), Size { width: 128.0, height: 72.0 });
+    assert_eq!(
+        view.drawable_size(),
+        Size {
+            width: 128.0,
+            height: 72.0
+        }
+    );
 
     let cloned_view = view.archive_round_trip()?;
-    assert_eq!(cloned_view.color_pixel_format(), pixel_format::BGRA8UNORM_SRGB);
+    assert_eq!(
+        cloned_view.color_pixel_format(),
+        pixel_format::BGRA8UNORM_SRGB
+    );
     assert!(cloned_view.drawable_size().width > 0.0);
     assert!(cloned_view.drawable_size().height > 0.0);
 

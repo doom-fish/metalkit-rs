@@ -145,7 +145,10 @@ impl ModelAsset {
     }
 
     #[must_use]
-    pub fn with_meshes(allocator: Option<&MeshBufferAllocator>, meshes: &[&ModelMesh]) -> Option<Self> {
+    pub fn with_meshes(
+        allocator: Option<&MeshBufferAllocator>,
+        meshes: &[&ModelMesh],
+    ) -> Option<Self> {
         let asset = Self::new(allocator)?;
         for mesh in meshes {
             if !asset.add_mesh(mesh) {

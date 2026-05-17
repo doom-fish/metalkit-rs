@@ -28,7 +28,10 @@ fn texture_loader_handles_urls_data_cgimages_mdltextures_and_array_failures() {
         .new_texture_from_url(common::SYSTEM_ICON, Some(&options))
         .expect("texture from url");
     let from_data = loader
-        .new_texture_from_data(&std::fs::read(common::SYSTEM_ICON).expect("icon bytes"), Some(&options))
+        .new_texture_from_data(
+            &std::fs::read(common::SYSTEM_ICON).expect("icon bytes"),
+            Some(&options),
+        )
         .expect("texture from data");
     let from_model_texture = loader
         .new_texture_from_model_texture(
@@ -45,7 +48,10 @@ fn texture_loader_handles_urls_data_cgimages_mdltextures_and_array_failures() {
         .new_texture_from_cgimage(&cg_image, Some(&options))
         .expect("texture from cgimage");
 
-    assert_eq!(TextureLoaderError::DOMAIN.as_str(), texture_loader_error::DOMAIN);
+    assert_eq!(
+        TextureLoaderError::DOMAIN.as_str(),
+        texture_loader_error::DOMAIN
+    );
     assert_eq!(TextureLoaderError::KEY.as_str(), texture_loader_error::KEY);
     assert!(from_url.width() > 0);
     assert_eq!(from_url.width(), from_data.width());
@@ -68,7 +74,12 @@ fn texture_loader_handles_urls_data_cgimages_mdltextures_and_array_failures() {
     assert!(url_array.error.is_some());
 
     assert!(loader
-        .new_texture_named("missing-texture", 1.0, Some(Path::new(CORE_TYPES_BUNDLE)), None)
+        .new_texture_named(
+            "missing-texture",
+            1.0,
+            Some(Path::new(CORE_TYPES_BUNDLE)),
+            None
+        )
         .is_err());
     assert!(loader
         .new_texture_named_with_display_gamut(
@@ -115,7 +126,8 @@ fn texture_loader_completion_handlers_load_urls_data_cgimages_and_mdltextures() 
         .with_generate_mipmaps(false)
         .with_allocate_mipmaps(false);
     let icon_bytes = std::fs::read(common::SYSTEM_ICON).expect("icon bytes");
-    let model_texture = ModelTexture::from_url(common::SYSTEM_ICON, Some("icon")).expect("model texture");
+    let model_texture =
+        ModelTexture::from_url(common::SYSTEM_ICON, Some("icon")).expect("model texture");
 
     let context = CGContext::new_rgba8(2, 2).expect("bitmap context");
     context.set_rgb_fill_color(1.0, 0.0, 0.0, 1.0);
@@ -124,10 +136,18 @@ fn texture_loader_completion_handlers_load_urls_data_cgimages_and_mdltextures() 
 
     let from_url = receive_texture_size_result(|tx| {
         loader
-            .new_texture_from_url_with_callback(common::SYSTEM_ICON, Some(&options), move |result| {
-                tx.send(result.map(|texture| (texture.width(), texture.height())).map_err(|error| error.to_string()))
+            .new_texture_from_url_with_callback(
+                common::SYSTEM_ICON,
+                Some(&options),
+                move |result| {
+                    tx.send(
+                        result
+                            .map(|texture| (texture.width(), texture.height()))
+                            .map_err(|error| error.to_string()),
+                    )
                     .expect("send url callback result");
-            })
+                },
+            )
             .expect("schedule url callback");
     })
     .expect("url callback outcome");
@@ -137,8 +157,12 @@ fn texture_loader_completion_handlers_load_urls_data_cgimages_and_mdltextures() 
     let from_data = receive_texture_size_result(|tx| {
         loader
             .new_texture_from_data_with_callback(&icon_bytes, Some(&options), move |result| {
-                tx.send(result.map(|texture| (texture.width(), texture.height())).map_err(|error| error.to_string()))
-                    .expect("send data callback result");
+                tx.send(
+                    result
+                        .map(|texture| (texture.width(), texture.height()))
+                        .map_err(|error| error.to_string()),
+                )
+                .expect("send data callback result");
             })
             .expect("schedule data callback");
     })
@@ -148,8 +172,12 @@ fn texture_loader_completion_handlers_load_urls_data_cgimages_and_mdltextures() 
     let from_cgimage = receive_texture_size_result(|tx| {
         loader
             .new_texture_from_cgimage_with_callback(&cg_image, Some(&options), move |result| {
-                tx.send(result.map(|texture| (texture.width(), texture.height())).map_err(|error| error.to_string()))
-                    .expect("send cgimage callback result");
+                tx.send(
+                    result
+                        .map(|texture| (texture.width(), texture.height()))
+                        .map_err(|error| error.to_string()),
+                )
+                .expect("send cgimage callback result");
             })
             .expect("schedule cgimage callback");
     })
@@ -159,10 +187,18 @@ fn texture_loader_completion_handlers_load_urls_data_cgimages_and_mdltextures() 
 
     let from_model_texture = receive_texture_size_result(|tx| {
         loader
-            .new_texture_from_model_texture_with_callback(&model_texture, Some(&options), move |result| {
-                tx.send(result.map(|texture| (texture.width(), texture.height())).map_err(|error| error.to_string()))
+            .new_texture_from_model_texture_with_callback(
+                &model_texture,
+                Some(&options),
+                move |result| {
+                    tx.send(
+                        result
+                            .map(|texture| (texture.width(), texture.height()))
+                            .map_err(|error| error.to_string()),
+                    )
                     .expect("send model texture callback result");
-            })
+                },
+            )
             .expect("schedule model texture callback");
     })
     .expect("model texture callback outcome");
@@ -207,8 +243,12 @@ fn texture_loader_completion_handlers_surface_array_and_named_errors() {
                 Some(Path::new(CORE_TYPES_BUNDLE)),
                 None,
                 move |result| {
-                    tx.send(result.map(|texture| (texture.width(), texture.height())).map_err(|error| error.to_string()))
-                        .expect("send named callback result");
+                    tx.send(
+                        result
+                            .map(|texture| (texture.width(), texture.height()))
+                            .map_err(|error| error.to_string()),
+                    )
+                    .expect("send named callback result");
                 },
             )
             .expect("schedule named callback");
@@ -225,8 +265,12 @@ fn texture_loader_completion_handlers_surface_array_and_named_errors() {
                 Some(Path::new(CORE_TYPES_BUNDLE)),
                 None,
                 move |result| {
-                    tx.send(result.map(|texture| (texture.width(), texture.height())).map_err(|error| error.to_string()))
-                        .expect("send named gamut callback result");
+                    tx.send(
+                        result
+                            .map(|texture| (texture.width(), texture.height()))
+                            .map_err(|error| error.to_string()),
+                    )
+                    .expect("send named gamut callback result");
                 },
             )
             .expect("schedule named gamut callback");
@@ -276,9 +320,7 @@ fn texture_loader_completion_handlers_surface_array_and_named_errors() {
     assert!(named_gamut_array_error.is_some());
 }
 
-fn receive_texture_size_result<F>(
-    schedule: F,
-) -> Result<(usize, usize), String>
+fn receive_texture_size_result<F>(schedule: F) -> Result<(usize, usize), String>
 where
     F: FnOnce(mpsc::Sender<Result<(usize, usize), String>>),
 {

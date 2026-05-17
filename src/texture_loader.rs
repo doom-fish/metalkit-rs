@@ -27,7 +27,8 @@ impl core::fmt::Display for TextureLoaderError {
     }
 }
 
-pub type TextureLoaderCallback = Box<dyn FnOnce(Result<MetalTexture, MetalKitError>) + Send + 'static>;
+pub type TextureLoaderCallback =
+    Box<dyn FnOnce(Result<MetalTexture, MetalKitError>) + Send + 'static>;
 pub type TextureLoaderArrayCallback = Box<dyn FnOnce(TextureLoaderArrayOutcome) + Send + 'static>;
 
 pub mod texture_loader_error {
@@ -130,7 +131,14 @@ impl core::fmt::Debug for TextureLoaderArrayOutcome {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("TextureLoaderArrayOutcome")
             .field("textures_len", &self.textures.len())
-            .field("loaded_count", &self.textures.iter().filter(|texture| texture.is_some()).count())
+            .field(
+                "loaded_count",
+                &self
+                    .textures
+                    .iter()
+                    .filter(|texture| texture.is_some())
+                    .count(),
+            )
             .field("error", &self.error)
             .finish()
     }
@@ -284,7 +292,9 @@ impl TextureLoaderOptionsOwned {
         }
         if options.cube_layout.is_some() {
             raw.flags |= ffi::OPTION_CUBE_LAYOUT;
-            raw.cube_layout = cube_layout.as_ref().map_or(ptr::null(), |value| value.as_ptr());
+            raw.cube_layout = cube_layout
+                .as_ref()
+                .map_or(ptr::null(), |value| value.as_ptr());
         }
         if options.origin.is_some() {
             raw.flags |= ffi::OPTION_ORIGIN;
@@ -345,7 +355,10 @@ impl<F> CallbackState<F> {
     where
         I: IntoIterator<Item = *mut c_void>,
     {
-        let retained = retained.into_iter().filter_map(RetainedHandle::new).collect();
+        let retained = retained
+            .into_iter()
+            .filter_map(RetainedHandle::new)
+            .collect();
         Box::into_raw(Box::new(Self {
             callback: Some(callback),
             fallback_message,
@@ -405,11 +418,8 @@ unsafe extern "C" fn texture_loader_array_callback_trampoline<F>(
         drop(take_c_string(error));
         return;
     };
-    let outcome = texture_array_from_result_with_fallback(
-        result,
-        error,
-        Some(state.fallback_message),
-    );
+    let outcome =
+        texture_array_from_result_with_fallback(result, error, Some(state.fallback_message));
     run_callback(callback, outcome);
 }
 
@@ -439,7 +449,9 @@ impl TextureLoader {
         let c_path = cstring_from_path(path.as_ref())
             .ok_or_else(|| MetalKitError::new("path contains an interior NUL byte"))?;
         let options = TextureLoaderOptionsOwned::new(options)?;
-        let options_ptr = options.as_ref().map_or(ptr::null(), TextureLoaderOptionsOwned::as_ptr);
+        let options_ptr = options
+            .as_ref()
+            .map_or(ptr::null(), TextureLoaderOptionsOwned::as_ptr);
         let mut error = ptr::null_mut();
         let texture = unsafe {
             ffi::mtk_texture_loader_new_texture_from_url(
@@ -465,7 +477,9 @@ impl TextureLoader {
         let c_path = cstring_from_path(path.as_ref())
             .ok_or_else(|| MetalKitError::new("path contains an interior NUL byte"))?;
         let options = TextureLoaderOptionsOwned::new(options)?;
-        let options_ptr = options.as_ref().map_or(ptr::null(), TextureLoaderOptionsOwned::as_ptr);
+        let options_ptr = options
+            .as_ref()
+            .map_or(ptr::null(), TextureLoaderOptionsOwned::as_ptr);
         let user_data = CallbackState::into_user_data(
             callback,
             "failed to load texture from URL",
@@ -490,7 +504,9 @@ impl TextureLoader {
     ) -> Result<TextureLoaderArrayOutcome, MetalKitError> {
         let (_owned_paths, raw_paths) = c_strings_from_paths(paths)?;
         let options = TextureLoaderOptionsOwned::new(options)?;
-        let options_ptr = options.as_ref().map_or(ptr::null(), TextureLoaderOptionsOwned::as_ptr);
+        let options_ptr = options
+            .as_ref()
+            .map_or(ptr::null(), TextureLoaderOptionsOwned::as_ptr);
         let mut error = ptr::null_mut();
         let result = unsafe {
             ffi::mtk_texture_loader_new_textures_from_urls(
@@ -520,7 +536,9 @@ impl TextureLoader {
     {
         let (_owned_paths, raw_paths) = c_strings_from_paths(paths)?;
         let options = TextureLoaderOptionsOwned::new(options)?;
-        let options_ptr = options.as_ref().map_or(ptr::null(), TextureLoaderOptionsOwned::as_ptr);
+        let options_ptr = options
+            .as_ref()
+            .map_or(ptr::null(), TextureLoaderOptionsOwned::as_ptr);
         let user_data = CallbackState::into_user_data(
             callback,
             "failed to load textures from URLs",
@@ -559,7 +577,9 @@ impl TextureLoader {
             })
             .transpose()?;
         let options = TextureLoaderOptionsOwned::new(options)?;
-        let options_ptr = options.as_ref().map_or(ptr::null(), TextureLoaderOptionsOwned::as_ptr);
+        let options_ptr = options
+            .as_ref()
+            .map_or(ptr::null(), TextureLoaderOptionsOwned::as_ptr);
         let mut error = ptr::null_mut();
         let texture = unsafe {
             ffi::mtk_texture_loader_new_texture_named(
@@ -596,7 +616,9 @@ impl TextureLoader {
             })
             .transpose()?;
         let options = TextureLoaderOptionsOwned::new(options)?;
-        let options_ptr = options.as_ref().map_or(ptr::null(), TextureLoaderOptionsOwned::as_ptr);
+        let options_ptr = options
+            .as_ref()
+            .map_or(ptr::null(), TextureLoaderOptionsOwned::as_ptr);
         let user_data = CallbackState::into_user_data(
             callback,
             "failed to load named texture",
@@ -635,7 +657,9 @@ impl TextureLoader {
             })
             .transpose()?;
         let options = TextureLoaderOptionsOwned::new(options)?;
-        let options_ptr = options.as_ref().map_or(ptr::null(), TextureLoaderOptionsOwned::as_ptr);
+        let options_ptr = options
+            .as_ref()
+            .map_or(ptr::null(), TextureLoaderOptionsOwned::as_ptr);
         let mut error = ptr::null_mut();
         let texture = unsafe {
             ffi::mtk_texture_loader_new_texture_named_with_display_gamut(
@@ -678,7 +702,9 @@ impl TextureLoader {
             })
             .transpose()?;
         let options = TextureLoaderOptionsOwned::new(options)?;
-        let options_ptr = options.as_ref().map_or(ptr::null(), TextureLoaderOptionsOwned::as_ptr);
+        let options_ptr = options
+            .as_ref()
+            .map_or(ptr::null(), TextureLoaderOptionsOwned::as_ptr);
         let user_data = CallbackState::into_user_data(
             callback,
             "failed to load named texture with display gamut",
@@ -716,7 +742,9 @@ impl TextureLoader {
             })
             .transpose()?;
         let options = TextureLoaderOptionsOwned::new(options)?;
-        let options_ptr = options.as_ref().map_or(ptr::null(), TextureLoaderOptionsOwned::as_ptr);
+        let options_ptr = options
+            .as_ref()
+            .map_or(ptr::null(), TextureLoaderOptionsOwned::as_ptr);
         let mut error = ptr::null_mut();
         let result = unsafe {
             ffi::mtk_texture_loader_new_textures_named(
@@ -757,7 +785,9 @@ impl TextureLoader {
             })
             .transpose()?;
         let options = TextureLoaderOptionsOwned::new(options)?;
-        let options_ptr = options.as_ref().map_or(ptr::null(), TextureLoaderOptionsOwned::as_ptr);
+        let options_ptr = options
+            .as_ref()
+            .map_or(ptr::null(), TextureLoaderOptionsOwned::as_ptr);
         let user_data = CallbackState::into_user_data(
             callback,
             "failed to load named textures",
@@ -800,7 +830,9 @@ impl TextureLoader {
             })
             .transpose()?;
         let options = TextureLoaderOptionsOwned::new(options)?;
-        let options_ptr = options.as_ref().map_or(ptr::null(), TextureLoaderOptionsOwned::as_ptr);
+        let options_ptr = options
+            .as_ref()
+            .map_or(ptr::null(), TextureLoaderOptionsOwned::as_ptr);
         let mut error = ptr::null_mut();
         let result = unsafe {
             ffi::mtk_texture_loader_new_textures_named_with_display_gamut(
@@ -843,7 +875,9 @@ impl TextureLoader {
             })
             .transpose()?;
         let options = TextureLoaderOptionsOwned::new(options)?;
-        let options_ptr = options.as_ref().map_or(ptr::null(), TextureLoaderOptionsOwned::as_ptr);
+        let options_ptr = options
+            .as_ref()
+            .map_or(ptr::null(), TextureLoaderOptionsOwned::as_ptr);
         let user_data = CallbackState::into_user_data(
             callback,
             "failed to load named textures with display gamut",
@@ -877,7 +911,9 @@ impl TextureLoader {
         options: Option<&TextureLoaderOptions>,
     ) -> Result<MetalTexture, MetalKitError> {
         let options = TextureLoaderOptionsOwned::new(options)?;
-        let options_ptr = options.as_ref().map_or(ptr::null(), TextureLoaderOptionsOwned::as_ptr);
+        let options_ptr = options
+            .as_ref()
+            .map_or(ptr::null(), TextureLoaderOptionsOwned::as_ptr);
         let mut error = ptr::null_mut();
         let bytes = if data.is_empty() {
             ptr::null()
@@ -906,7 +942,9 @@ impl TextureLoader {
         F: FnOnce(Result<MetalTexture, MetalKitError>) + Send + 'static,
     {
         let options = TextureLoaderOptionsOwned::new(options)?;
-        let options_ptr = options.as_ref().map_or(ptr::null(), TextureLoaderOptionsOwned::as_ptr);
+        let options_ptr = options
+            .as_ref()
+            .map_or(ptr::null(), TextureLoaderOptionsOwned::as_ptr);
         let bytes = if data.is_empty() {
             ptr::null()
         } else {
@@ -936,7 +974,9 @@ impl TextureLoader {
         options: Option<&TextureLoaderOptions>,
     ) -> Result<MetalTexture, MetalKitError> {
         let options = TextureLoaderOptionsOwned::new(options)?;
-        let options_ptr = options.as_ref().map_or(ptr::null(), TextureLoaderOptionsOwned::as_ptr);
+        let options_ptr = options
+            .as_ref()
+            .map_or(ptr::null(), TextureLoaderOptionsOwned::as_ptr);
         let mut error = ptr::null_mut();
         let texture = unsafe {
             ffi::mtk_texture_loader_new_texture_from_cgimage(
@@ -959,7 +999,9 @@ impl TextureLoader {
         F: FnOnce(Result<MetalTexture, MetalKitError>) + Send + 'static,
     {
         let options = TextureLoaderOptionsOwned::new(options)?;
-        let options_ptr = options.as_ref().map_or(ptr::null(), TextureLoaderOptionsOwned::as_ptr);
+        let options_ptr = options
+            .as_ref()
+            .map_or(ptr::null(), TextureLoaderOptionsOwned::as_ptr);
         let user_data = CallbackState::into_user_data(
             callback,
             "failed to load texture from CGImage",
@@ -983,7 +1025,9 @@ impl TextureLoader {
         options: Option<&TextureLoaderOptions>,
     ) -> Result<MetalTexture, MetalKitError> {
         let options = TextureLoaderOptionsOwned::new(options)?;
-        let options_ptr = options.as_ref().map_or(ptr::null(), TextureLoaderOptionsOwned::as_ptr);
+        let options_ptr = options
+            .as_ref()
+            .map_or(ptr::null(), TextureLoaderOptionsOwned::as_ptr);
         let mut error = ptr::null_mut();
         let texture = unsafe {
             ffi::mtk_texture_loader_new_texture_from_model_texture(
@@ -1006,7 +1050,9 @@ impl TextureLoader {
         F: FnOnce(Result<MetalTexture, MetalKitError>) + Send + 'static,
     {
         let options = TextureLoaderOptionsOwned::new(options)?;
-        let options_ptr = options.as_ref().map_or(ptr::null(), TextureLoaderOptionsOwned::as_ptr);
+        let options_ptr = options
+            .as_ref()
+            .map_or(ptr::null(), TextureLoaderOptionsOwned::as_ptr);
         let user_data = CallbackState::into_user_data(
             callback,
             "failed to load texture from MDLTexture",
@@ -1050,9 +1096,13 @@ fn texture_array_from_result_with_fallback(
     error: *mut libc::c_char,
     fallback_message: Option<&str>,
 ) -> TextureLoaderArrayOutcome {
-    let error = take_c_string(error)
-        .map(MetalKitError::new)
-        .or_else(|| result.is_null().then_some(fallback_message).flatten().map(MetalKitError::new));
+    let error = take_c_string(error).map(MetalKitError::new).or_else(|| {
+        result
+            .is_null()
+            .then_some(fallback_message)
+            .flatten()
+            .map(MetalKitError::new)
+    });
     let textures = if result.is_null() {
         Vec::new()
     } else {

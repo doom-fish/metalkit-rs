@@ -58,10 +58,10 @@ pub use view::{ClearColor, Rect, Size, View, ViewDelegate, ViewDelegateCallbacks
 pub mod prelude {
     pub use crate::{
         metal_vertex_descriptor_from_model_io, model_io_vertex_descriptor_from_metal, ClearColor,
-        DisplayGamut, GeometryType, Mesh, MeshAssetConversion, MeshBuffer,
-        MeshBufferAllocator, MeshBufferType, ModelAsset, ModelError, ModelMesh, ModelTexture,
-        ModelVertexDescriptor, PrimitiveType, Rect, Size, Submesh, TextureLoader,
-        TextureLoaderArrayCallback, TextureLoaderCallback, TextureLoaderError,
-        TextureLoaderOptions, View, ViewDelegate, ViewDelegateCallbacks,
+        DisplayGamut, GeometryType, Mesh, MeshAssetConversion, MeshBuffer, MeshBufferAllocator,
+        MeshBufferType, ModelAsset, ModelError, ModelMesh, ModelTexture, ModelVertexDescriptor,
+        PrimitiveType, Rect, Size, Submesh, TextureLoader, TextureLoaderArrayCallback,
+        TextureLoaderCallback, TextureLoaderError, TextureLoaderOptions, View, ViewDelegate,
+        ViewDelegateCallbacks,
     };
 }

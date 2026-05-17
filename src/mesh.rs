@@ -52,7 +52,8 @@ impl Mesh {
         }
 
         let mesh_count = unsafe { ffi::mtk_meshes_from_asset_result_mesh_count(result) };
-        let source_mesh_count = unsafe { ffi::mtk_meshes_from_asset_result_source_mesh_count(result) };
+        let source_mesh_count =
+            unsafe { ffi::mtk_meshes_from_asset_result_source_mesh_count(result) };
         let meshes = (0..mesh_count)
             .filter_map(|index| unsafe {
                 Mesh::from_raw(ffi::mtk_meshes_from_asset_result_mesh_at(result, index))
@@ -60,7 +61,9 @@ impl Mesh {
             .collect();
         let source_meshes = (0..source_mesh_count)
             .filter_map(|index| unsafe {
-                ModelMesh::from_raw(ffi::mtk_meshes_from_asset_result_source_mesh_at(result, index))
+                ModelMesh::from_raw(ffi::mtk_meshes_from_asset_result_source_mesh_at(
+                    result, index,
+                ))
             })
             .collect();
         unsafe { ffi::mtk_release(result) };

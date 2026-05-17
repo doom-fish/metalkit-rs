@@ -29,8 +29,12 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         let (tx, rx) = mpsc::channel();
         loader.new_texture_from_url_with_callback(SYSTEM_ICON, Some(&options), move |result| {
-            tx.send(result.map(|texture| (texture.width(), texture.height())).map_err(|error| error.to_string()))
-                .expect("send async texture result");
+            tx.send(
+                result
+                    .map(|texture| (texture.width(), texture.height()))
+                    .map_err(|error| error.to_string()),
+            )
+            .expect("send async texture result");
         })?;
         let async_texture = rx
             .recv_timeout(CALLBACK_TIMEOUT)
@@ -40,11 +44,18 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         let (tx, rx) = mpsc::channel();
         loader.new_textures_from_urls_with_callback(
-            &[Path::new(SYSTEM_ICON), Path::new("/definitely/missing-texture.png")],
+            &[
+                Path::new(SYSTEM_ICON),
+                Path::new("/definitely/missing-texture.png"),
+            ],
             Some(&options),
             move |outcome| {
                 tx.send((
-                    outcome.textures.iter().filter(|texture| texture.is_some()).count(),
+                    outcome
+                        .textures
+                        .iter()
+                        .filter(|texture| texture.is_some())
+                        .count(),
                     outcome.error.is_some(),
                 ))
                 .expect("send async texture array result");

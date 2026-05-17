@@ -50,13 +50,7 @@ unsafe extern "C" {
         out_blue: *mut f64,
         out_alpha: *mut f64,
     );
-    pub fn mtk_view_set_clear_color(
-        view: *mut c_void,
-        red: f64,
-        green: f64,
-        blue: f64,
-        alpha: f64,
-    );
+    pub fn mtk_view_set_clear_color(view: *mut c_void, red: f64, green: f64, blue: f64, alpha: f64);
     pub fn mtk_view_clear_depth(view: *mut c_void) -> f64;
     pub fn mtk_view_set_clear_depth(view: *mut c_void, value: f64);
     pub fn mtk_view_clear_stencil(view: *mut c_void) -> u32;

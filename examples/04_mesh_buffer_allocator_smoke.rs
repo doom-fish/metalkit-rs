@@ -5,7 +5,9 @@ fn main() {
     let device = MetalDevice::system_default().expect("no Metal device available");
     let allocator = MeshBufferAllocator::new(&device).expect("mesh buffer allocator");
 
-    let empty = allocator.new_buffer(32, MeshBufferType::Vertex).expect("vertex buffer");
+    let empty = allocator
+        .new_buffer(32, MeshBufferType::Vertex)
+        .expect("vertex buffer");
     assert_eq!(empty.length(), 32);
     assert!(!empty.metal_buffer_ptr().is_null());
 

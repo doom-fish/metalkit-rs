@@ -85,10 +85,7 @@ pub(crate) fn take_c_string(ptr: *mut libc::c_char) -> Option<String> {
 }
 
 pub(crate) fn take_error(ptr: *mut libc::c_char, fallback_message: &str) -> MetalKitError {
-    take_c_string(ptr).map_or_else(
-        || MetalKitError::new(fallback_message),
-        MetalKitError::new,
-    )
+    take_c_string(ptr).map_or_else(|| MetalKitError::new(fallback_message), MetalKitError::new)
 }
 
 pub(crate) fn parse_json<T: DeserializeOwned>(
@@ -97,7 +94,6 @@ pub(crate) fn parse_json<T: DeserializeOwned>(
 ) -> Result<T, MetalKitError> {
     let json = take_c_string(ptr)
         .ok_or_else(|| MetalKitError::new(format!("missing {type_name} JSON payload")))?;
-    serde_json::from_str(&json).map_err(|err| {
-        MetalKitError::new(format!("failed to parse {type_name} JSON: {err}"))
-    })
+    serde_json::from_str(&json)
+        .map_err(|err| MetalKitError::new(format!("failed to parse {type_name} JSON: {err}")))
 }

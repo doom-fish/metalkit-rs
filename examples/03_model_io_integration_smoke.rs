@@ -1,8 +1,8 @@
 use apple_metal::MetalDevice;
 use metalkit::{
-    metal_vertex_descriptor_from_model_io, metal_vertex_format, model_io_vertex_descriptor_from_metal,
-    model_vertex_format, MetalVertexDescriptor, ModelAsset, ModelTexture, ModelVertexDescriptor,
-    TextureLoader,
+    metal_vertex_descriptor_from_model_io, metal_vertex_format,
+    model_io_vertex_descriptor_from_metal, model_vertex_format, MetalVertexDescriptor, ModelAsset,
+    ModelTexture, ModelVertexDescriptor, TextureLoader,
 };
 use std::error::Error;
 
@@ -30,13 +30,21 @@ fn main() -> Result<(), Box<dyn Error>> {
     let metal_descriptor = MetalVertexDescriptor::new().expect("metal descriptor");
     assert!(metal_descriptor.set_attribute(0, metal_vertex_format::FLOAT3, 0, 0));
     assert!(metal_descriptor.set_layout(0, 12));
-    let model_descriptor = model_io_vertex_descriptor_from_metal(&metal_descriptor).expect("model descriptor");
+    let model_descriptor =
+        model_io_vertex_descriptor_from_metal(&metal_descriptor).expect("model descriptor");
     assert_eq!(model_descriptor.info()?.attributes.len(), 1);
 
     let explicit_model_descriptor = ModelVertexDescriptor::new().expect("empty model descriptor");
-    assert!(explicit_model_descriptor.set_attribute(0, "POSITION", model_vertex_format::FLOAT3, 0, 0)?);
+    assert!(explicit_model_descriptor.set_attribute(
+        0,
+        "POSITION",
+        model_vertex_format::FLOAT3,
+        0,
+        0
+    )?);
     assert!(explicit_model_descriptor.set_layout(0, 12));
-    let round_trip = metal_vertex_descriptor_from_model_io(&explicit_model_descriptor).expect("round-trip metal descriptor");
+    let round_trip = metal_vertex_descriptor_from_model_io(&explicit_model_descriptor)
+        .expect("round-trip metal descriptor");
     assert_eq!(round_trip.info()?.attributes.len(), 1);
 
     println!("✅ metalkit Model I/O integration OK");

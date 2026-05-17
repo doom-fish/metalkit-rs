@@ -182,7 +182,8 @@ impl View {
 
     pub fn archive_round_trip(&self) -> Result<Self, MetalKitError> {
         let mut error = ptr::null_mut();
-        let view = unsafe { ffi::mtk_view_archive_round_trip(self.as_ptr(), ptr::addr_of_mut!(error)) };
+        let view =
+            unsafe { ffi::mtk_view_archive_round_trip(self.as_ptr(), ptr::addr_of_mut!(error)) };
         if view.is_null() {
             Err(take_error(error, "failed to archive and unarchive MTKView"))
         } else {

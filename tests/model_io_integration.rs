@@ -17,7 +17,10 @@ fn model_asset_texture_and_vertex_descriptor_helpers_work() {
 
     let asset = ModelAsset::with_meshes(Some(&allocator), &[&model_mesh]).expect("asset");
     assert_eq!(asset.count(), 1);
-    assert_eq!(asset.mesh_at(0).expect("mesh").vertex_count(), model_mesh.vertex_count());
+    assert_eq!(
+        asset.mesh_at(0).expect("mesh").vertex_count(),
+        model_mesh.vertex_count()
+    );
 
     let texture = ModelTexture::from_url(common::SYSTEM_ICON, Some("icon")).expect("model texture");
     let loader = metalkit::TextureLoader::new(&device).expect("texture loader");
@@ -47,12 +50,20 @@ fn model_asset_texture_and_vertex_descriptor_helpers_work() {
     assert!(explicit_model_descriptor.set_layout(0, 12));
     let round_trip_metal = metal_vertex_descriptor_from_model_io(&explicit_model_descriptor)
         .expect("metal descriptor from model descriptor");
-    let round_trip_info = round_trip_metal.info().expect("round-trip metal descriptor info");
+    let round_trip_info = round_trip_metal
+        .info()
+        .expect("round-trip metal descriptor info");
     assert_eq!(round_trip_info.attributes.len(), 1);
     assert_eq!(round_trip_info.layouts.len(), 1);
 
-    assert_eq!(model_io_vertex_format_from_metal(metal_vertex_format::FLOAT3), model_vertex_format::FLOAT3);
-    assert_eq!(metal_vertex_format_from_model_io(model_vertex_format::FLOAT3), metal_vertex_format::FLOAT3);
+    assert_eq!(
+        model_io_vertex_format_from_metal(metal_vertex_format::FLOAT3),
+        model_vertex_format::FLOAT3
+    );
+    assert_eq!(
+        metal_vertex_format_from_model_io(model_vertex_format::FLOAT3),
+        metal_vertex_format::FLOAT3
+    );
     assert_eq!(ModelError::DOMAIN.as_str(), model_error::DOMAIN);
     assert_eq!(ModelError::KEY.as_str(), model_error::KEY);
 }

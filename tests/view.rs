@@ -6,7 +6,10 @@ use metalkit::{ClearColor, Rect, Size, View, ViewDelegate, ViewDelegateCallbacks
 use std::sync::{Arc, Mutex};
 
 fn approx_eq(left: f64, right: f64) {
-    assert!((left - right).abs() < f64::EPSILON, "left={left}, right={right}");
+    assert!(
+        (left - right).abs() < f64::EPSILON,
+        "left={left}, right={right}"
+    );
 }
 
 #[test]
@@ -32,13 +35,18 @@ fn view_exposes_properties_and_delegate_callbacks() {
     view.set_framebuffer_only(true);
     assert!(view.framebuffer_only());
 
-    view.set_depth_stencil_attachment_texture_usage(texture_usage::SHADER_READ | texture_usage::RENDER_TARGET);
+    view.set_depth_stencil_attachment_texture_usage(
+        texture_usage::SHADER_READ | texture_usage::RENDER_TARGET,
+    );
     assert_eq!(
         view.depth_stencil_attachment_texture_usage(),
         texture_usage::SHADER_READ | texture_usage::RENDER_TARGET
     );
     view.set_multisample_color_attachment_texture_usage(texture_usage::RENDER_TARGET);
-    assert_eq!(view.multisample_color_attachment_texture_usage(), texture_usage::RENDER_TARGET);
+    assert_eq!(
+        view.multisample_color_attachment_texture_usage(),
+        texture_usage::RENDER_TARGET
+    );
 
     view.set_presents_with_transaction(true);
     assert!(view.presents_with_transaction());
@@ -67,7 +75,10 @@ fn view_exposes_properties_and_delegate_callbacks() {
     view.set_colorspace(Some(&color_space));
 
     assert_eq!(view.color_pixel_format(), pixel_format::BGRA8UNORM_SRGB);
-    assert_eq!(view.depth_stencil_pixel_format(), pixel_format::DEPTH32FLOAT);
+    assert_eq!(
+        view.depth_stencil_pixel_format(),
+        pixel_format::DEPTH32FLOAT
+    );
     assert_eq!(view.depth_stencil_storage_mode(), storage_mode::PRIVATE);
     assert_eq!(view.sample_count(), 4);
     approx_eq(view.clear_depth(), 0.5);
@@ -75,7 +86,13 @@ fn view_exposes_properties_and_delegate_callbacks() {
     assert_eq!(view.preferred_frames_per_second(), 30);
     assert!(view.enable_set_needs_display());
     assert!(!view.auto_resize_drawable());
-    assert_eq!(view.drawable_size(), Size { width: 128.0, height: 72.0 });
+    assert_eq!(
+        view.drawable_size(),
+        Size {
+            width: 128.0,
+            height: 72.0
+        }
+    );
     assert!(view.is_paused());
     assert!(!view.colorspace_ptr().is_null());
     assert!(!view.preferred_device_ptr().is_null());
@@ -113,8 +130,17 @@ fn view_exposes_properties_and_delegate_callbacks() {
     view.release_drawables();
 
     assert!(*draw_count.lock().expect("draw count") >= 1);
-    assert_eq!(resize_events.lock().expect("resize events").as_slice(), &[Size { width: 128.0, height: 72.0 }]);
+    assert_eq!(
+        resize_events.lock().expect("resize events").as_slice(),
+        &[Size {
+            width: 128.0,
+            height: 72.0
+        }]
+    );
 
     let cloned_view = view.archive_round_trip().expect("archive round trip");
-    assert_eq!(cloned_view.color_pixel_format(), pixel_format::BGRA8UNORM_SRGB);
+    assert_eq!(
+        cloned_view.color_pixel_format(),
+        pixel_format::BGRA8UNORM_SRGB
+    );
 }
