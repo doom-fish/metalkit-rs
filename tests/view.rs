@@ -13,6 +13,7 @@ fn approx_eq(left: f64, right: f64) {
 }
 
 #[test]
+#[allow(clippy::too_many_lines)]
 fn view_exposes_properties_and_delegate_callbacks() {
     let device = common::device();
     let view = View::new(

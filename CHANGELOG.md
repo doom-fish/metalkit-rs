@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.2.2
+
+- Added `@available(macOS 26.0, *)` declaration attribute to the
+  `mtk_view_current_mtl4_render_pass_descriptor` Swift bridge thunk, which
+  references `MTKView.currentMTL4RenderPassDescriptor` — an API introduced
+  in macOS 26 / iOS 26. The function body previously used an `if #available`
+  guard; the outer `@available` attribute now makes the declaration
+  self-documenting and SDK-portable so the bridge compiles correctly against
+  any SDK that includes the macOS 26 headers.
+- Bumped `apple-metal` version constraint to `>=0.5, <0.9` to track the
+  `0.8.x` release.
+- Added `#[allow(clippy::too_many_lines)]` to two large integration-test
+  functions that tripped the lint after the dependency update.
+
 ## 0.2.1
 
 - Added `MTKTextureLoader` completion-handler wrappers for URL, named, `CGImage`, `MDLTexture`, data, and batch loading APIs via safe Rust callbacks

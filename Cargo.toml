@@ -1,6 +1,6 @@
 [package]
 name = "metalkit-rs"
-version = "0.2.1"
+version = "0.2.2"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 homepage = "https://github.com/doom-fish/metalkit-rs"
@@ -46,7 +46,7 @@ libc = "0.2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 apple-cf = { path = "../apple-cf-rs", version = ">=0.4, <0.8", features = ["cg"] }
-apple-metal = { path = "../apple-metal-rs", version = ">=0.5, <0.8" }
+apple-metal = { path = "../apple-metal-rs", version = ">=0.5, <0.9" }
 
 [package.metadata.docs.rs]
 all-features = true

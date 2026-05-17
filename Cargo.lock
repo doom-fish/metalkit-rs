@@ -11,7 +11,7 @@ dependencies = [
 
 [[package]]
 name = "apple-metal"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "apple-cf",
  "libc",
@@ -41,7 +41,7 @@ checksum = "f8ca58f447f06ed17d5fc4043ce1b10dd205e060fb3ce5b979b8ed8e59ff3f79"
 
 [[package]]
 name = "metalkit-rs"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "apple-cf",
  "apple-metal",

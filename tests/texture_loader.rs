@@ -206,6 +206,7 @@ fn texture_loader_completion_handlers_load_urls_data_cgimages_and_mdltextures() 
 }
 
 #[test]
+#[allow(clippy::too_many_lines)]
 fn texture_loader_completion_handlers_surface_array_and_named_errors() {
     let device = common::device();
     let loader = TextureLoader::new(&device).expect("texture loader");

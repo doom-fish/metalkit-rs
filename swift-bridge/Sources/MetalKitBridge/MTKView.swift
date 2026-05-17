@@ -378,18 +378,15 @@ func mtk_view_current_render_pass_descriptor(_ viewPtr: UnsafeMutableRawPointer?
     return Unmanaged.passUnretained(descriptor).toOpaque()
 }
 
+@available(macOS 26.0, *)
 @_cdecl("mtk_view_current_mtl4_render_pass_descriptor")
 func mtk_view_current_mtl4_render_pass_descriptor(_ viewPtr: UnsafeMutableRawPointer?) -> UnsafeMutableRawPointer? {
-    guard let view: MTKView = mtkBorrow(viewPtr, as: MTKView.self) else {
+    guard let view: MTKView = mtkBorrow(viewPtr, as: MTKView.self),
+          let descriptor = view.currentMTL4RenderPassDescriptor
+    else {
         return nil
     }
-    if #available(macOS 26.0, *) {
-        guard let descriptor = view.currentMTL4RenderPassDescriptor else {
-            return nil
-        }
-        return Unmanaged.passUnretained(descriptor).toOpaque()
-    }
-    return nil
+    return Unmanaged.passUnretained(descriptor).toOpaque()
 }
 
 @_cdecl("mtk_view_preferred_frames_per_second")
