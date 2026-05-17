@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.3
+
+- Fixed version constraints for `apple-cf` and `apple-metal` dependencies
+  to use the standard `>=X.Y, <X.(Y+2)` pattern for semantic versioning drift.
+
 ## 0.2.2
 
 - Added `@available(macOS 26.0, *)` declaration attribute to the
