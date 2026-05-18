@@ -5,20 +5,23 @@ use apple_metal::MetalDevice;
 use core::ffi::c_void;
 use std::ptr;
 
-handle_type!(MeshBufferAllocator);
+handle_type!(MeshBufferAllocator, "Wraps `MTKMeshBufferAllocator`.");
 
 impl MeshBufferAllocator {
     #[must_use]
+    /// Creates an `MTKMeshBufferAllocator`.
     pub fn new(device: &MetalDevice) -> Option<Self> {
         unsafe { Self::from_raw(ffi::mtk_mesh_buffer_allocator_new(device.as_ptr())) }
     }
 
     #[must_use]
+    /// Returns the raw pointer from `MTKMeshBufferAllocator.device`.
     pub fn device_ptr(&self) -> *mut c_void {
         unsafe { ffi::mtk_mesh_buffer_allocator_device(self.as_ptr()) }
     }
 
     #[must_use]
+    /// Calls `-[MTKMeshBufferAllocator newBufferWithLength:type:]`.
     pub fn new_buffer(&self, length: usize, buffer_type: MeshBufferType) -> Option<MeshBuffer> {
         unsafe {
             MeshBuffer::from_raw(ffi::mtk_mesh_buffer_allocator_new_buffer(
@@ -30,6 +33,7 @@ impl MeshBufferAllocator {
     }
 
     #[must_use]
+    /// Calls `-[MTKMeshBufferAllocator newBufferWithData:type:]`.
     pub fn new_buffer_with_data(
         &self,
         data: &[u8],

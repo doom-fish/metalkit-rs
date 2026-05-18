@@ -5,7 +5,12 @@ use std::os::unix::ffi::OsStrExt;
 use std::path::Path;
 
 macro_rules! handle_type {
-    ($name:ident) => {
+    ($name:ident, $doc:literal) => {
+        handle_type!(#[doc = $doc] $name);
+    };
+
+    ($(#[$meta:meta])* $name:ident) => {
+        $(#[$meta])*
         pub struct $name {
             pub(crate) ptr: *mut core::ffi::c_void,
             owned: bool,

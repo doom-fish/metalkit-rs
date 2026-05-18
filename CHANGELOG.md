@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.2.5] - 2026-05-18
+
+- Added one-line Rustdoc coverage across the public MetalKit surface in `src/`, including wrapper types, enums, option constants, and view/loader/model helpers.
+- Raised the public API doc pass to full coverage for the crate source set.
+
 ## [0.2.4] - 2026-05-18
 
 - Widen apple-cf version bound to `<0.10` so 0.9.x resolves.

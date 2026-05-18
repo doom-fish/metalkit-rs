@@ -9,13 +9,15 @@ use std::ffi::CString;
 use std::path::Path;
 use std::ptr;
 
-handle_type!(TextureLoader);
+handle_type!(TextureLoader, "Wraps `MTKTextureLoader`.");
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// Wraps `MetalKit` `MTKTextureLoaderError*` string constants.
 pub struct TextureLoaderError(&'static str);
 
 impl TextureLoaderError {
     #[must_use]
+    /// Returns the wrapped `MTKTextureLoaderError*` string constant.
     pub const fn as_str(self) -> &'static str {
         self.0
     }
@@ -27,89 +29,121 @@ impl core::fmt::Display for TextureLoaderError {
     }
 }
 
+/// Mirrors the completion handler used by `MTKTextureLoader` single-texture APIs.
 pub type TextureLoaderCallback =
     Box<dyn FnOnce(Result<MetalTexture, MetalKitError>) + Send + 'static>;
+/// Mirrors the completion handler used by batched `MTKTextureLoader` APIs.
 pub type TextureLoaderArrayCallback = Box<dyn FnOnce(TextureLoaderArrayOutcome) + Send + 'static>;
 
+/// Exposes `MTKTextureLoaderError*` string constants.
 pub mod texture_loader_error {
+    /// Exposes `MTKTextureLoaderErrorDomain`.
     pub const DOMAIN: &str = "MTKTextureLoaderErrorDomain";
+    /// Exposes `MTKTextureLoaderErrorKey`.
     pub const KEY: &str = "MTKTextureLoaderErrorKey";
 }
 
 impl TextureLoaderError {
+    /// Wraps `MTKTextureLoaderErrorDomain`.
     pub const DOMAIN: Self = Self(texture_loader_error::DOMAIN);
+    /// Wraps `MTKTextureLoaderErrorKey`.
     pub const KEY: Self = Self(texture_loader_error::KEY);
 }
 
+/// Exposes `MTKTextureLoaderOption*` dictionary keys.
 pub mod texture_loader_option {
     use super::TextureLoaderOptionKey;
 
+    /// Exposes `MTKTextureLoaderOptionAllocateMipmaps`.
     pub const ALLOCATE_MIPMAPS: TextureLoaderOptionKey =
         TextureLoaderOptionKey("MTKTextureLoaderOptionAllocateMipmaps");
+    /// Exposes `MTKTextureLoaderOptionGenerateMipmaps`.
     pub const GENERATE_MIPMAPS: TextureLoaderOptionKey =
         TextureLoaderOptionKey("MTKTextureLoaderOptionGenerateMipmaps");
+    /// Exposes `MTKTextureLoaderOptionSRGB`.
     pub const SRGB: TextureLoaderOptionKey = TextureLoaderOptionKey("MTKTextureLoaderOptionSRGB");
+    /// Exposes `MTKTextureLoaderOptionTextureUsage`.
     pub const TEXTURE_USAGE: TextureLoaderOptionKey =
         TextureLoaderOptionKey("MTKTextureLoaderOptionTextureUsage");
+    /// Exposes `MTKTextureLoaderOptionTextureStorageMode`.
     pub const TEXTURE_STORAGE_MODE: TextureLoaderOptionKey =
         TextureLoaderOptionKey("MTKTextureLoaderOptionTextureStorageMode");
+    /// Exposes `MTKTextureLoaderOptionTextureCPUCacheMode`.
     pub const TEXTURE_CPU_CACHE_MODE: TextureLoaderOptionKey =
         TextureLoaderOptionKey("MTKTextureLoaderOptionTextureCPUCacheMode");
+    /// Exposes `MTKTextureLoaderOptionCubeLayout`.
     pub const CUBE_LAYOUT: TextureLoaderOptionKey =
         TextureLoaderOptionKey("MTKTextureLoaderOptionCubeLayout");
+    /// Exposes `MTKTextureLoaderOptionOrigin`.
     pub const ORIGIN: TextureLoaderOptionKey =
         TextureLoaderOptionKey("MTKTextureLoaderOptionOrigin");
+    /// Exposes `MTKTextureLoaderOptionLoadAsArray`.
     pub const LOAD_AS_ARRAY: TextureLoaderOptionKey =
         TextureLoaderOptionKey("MTKTextureLoaderOptionLoadAsArray");
 }
 
+/// Exposes `MTKTextureLoaderCubeLayout*` option values.
 pub mod texture_loader_cube_layout {
     use super::TextureLoaderCubeLayout;
 
+    /// Exposes `MTKTextureLoaderCubeLayoutVertical`.
     pub const VERTICAL: TextureLoaderCubeLayout =
         TextureLoaderCubeLayout("MTKTextureLoaderCubeLayoutVertical");
 }
 
+/// Exposes `MTKTextureLoaderOrigin*` option values.
 pub mod texture_loader_origin {
     use super::TextureLoaderOrigin;
 
+    /// Exposes `MTKTextureLoaderOriginTopLeft`.
     pub const TOP_LEFT: TextureLoaderOrigin = TextureLoaderOrigin("MTKTextureLoaderOriginTopLeft");
+    /// Exposes `MTKTextureLoaderOriginBottomLeft`.
     pub const BOTTOM_LEFT: TextureLoaderOrigin =
         TextureLoaderOrigin("MTKTextureLoaderOriginBottomLeft");
+    /// Exposes `MTKTextureLoaderOriginFlippedVertically`.
     pub const FLIPPED_VERTICALLY: TextureLoaderOrigin =
         TextureLoaderOrigin("MTKTextureLoaderOriginFlippedVertically");
 }
 
+/// Exposes `MTLCPUCacheMode` values used by `MTKTextureLoader` options.
 pub mod texture_cpu_cache_mode {
+    /// Mirrors `MTLCPUCacheModeDefaultCache`.
     pub const DEFAULT_CACHE: usize = 0;
+    /// Mirrors `MTLCPUCacheModeWriteCombined`.
     pub const WRITE_COMBINED: usize = 1;
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// Wraps an `MTKTextureLoaderOption*` dictionary key.
 pub struct TextureLoaderOptionKey(&'static str);
 
 impl TextureLoaderOptionKey {
     #[must_use]
+    /// Returns the wrapped `MTKTextureLoaderOption*` key.
     pub const fn as_str(self) -> &'static str {
         self.0
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// Wraps an `MTKTextureLoaderCubeLayout*` option value.
 pub struct TextureLoaderCubeLayout(&'static str);
 
 impl TextureLoaderCubeLayout {
     #[must_use]
+    /// Returns the wrapped `MTKTextureLoaderCubeLayout*` value.
     pub const fn as_str(self) -> &'static str {
         self.0
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// Wraps an `MTKTextureLoaderOrigin*` option value.
 pub struct TextureLoaderOrigin(&'static str);
 
 impl TextureLoaderOrigin {
     #[must_use]
+    /// Returns the wrapped `MTKTextureLoaderOrigin*` value.
     pub const fn as_str(self) -> &'static str {
         self.0
     }
@@ -117,13 +151,19 @@ impl TextureLoaderOrigin {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(usize)]
+/// Mirrors the display gamut choices accepted by `MTKTextureLoader` asset-name APIs.
 pub enum DisplayGamut {
+    /// Uses the sRGB display gamut accepted by `MTKTextureLoader` asset-name APIs.
     SRGB = 1,
+    /// Uses the P3 display gamut accepted by `MTKTextureLoader` asset-name APIs.
     P3 = 2,
 }
 
+/// Collects the results returned by batched `MTKTextureLoader` APIs.
 pub struct TextureLoaderArrayOutcome {
+    /// Contains the `MTLTexture` results returned by `MTKTextureLoader`.
     pub textures: Vec<Option<MetalTexture>>,
+    /// Contains the batch error reported by `MTKTextureLoader`, if any.
     pub error: Option<MetalKitError>,
 }
 
@@ -146,12 +186,14 @@ impl core::fmt::Debug for TextureLoaderArrayOutcome {
 
 impl TextureLoaderArrayOutcome {
     #[must_use]
+    /// Returns whether the batched `MTKTextureLoader` request completed without an error.
     pub const fn is_success(&self) -> bool {
         self.error.is_none()
     }
 }
 
 #[derive(Debug, Clone, Default)]
+/// Collects option entries for `MTKTextureLoader` requests.
 pub struct TextureLoaderOptions {
     generate_mipmaps: Option<bool>,
     allocate_mipmaps: Option<bool>,
@@ -166,6 +208,7 @@ pub struct TextureLoaderOptions {
 
 impl TextureLoaderOptions {
     #[must_use]
+    /// Creates an empty `MTKTextureLoader` options builder.
     pub const fn new() -> Self {
         Self {
             generate_mipmaps: None,
@@ -181,54 +224,63 @@ impl TextureLoaderOptions {
     }
 
     #[must_use]
+    /// Sets `MTKTextureLoaderOptionGenerateMipmaps`.
     pub const fn with_generate_mipmaps(mut self, value: bool) -> Self {
         self.generate_mipmaps = Some(value);
         self
     }
 
     #[must_use]
+    /// Sets `MTKTextureLoaderOptionAllocateMipmaps`.
     pub const fn with_allocate_mipmaps(mut self, value: bool) -> Self {
         self.allocate_mipmaps = Some(value);
         self
     }
 
     #[must_use]
+    /// Sets `MTKTextureLoaderOptionSRGB`.
     pub const fn with_srgb(mut self, value: bool) -> Self {
         self.srgb = Some(value);
         self
     }
 
     #[must_use]
+    /// Sets `MTKTextureLoaderOptionTextureUsage`.
     pub const fn with_texture_usage(mut self, value: usize) -> Self {
         self.texture_usage = Some(value);
         self
     }
 
     #[must_use]
+    /// Sets `MTKTextureLoaderOptionTextureStorageMode`.
     pub const fn with_texture_storage_mode(mut self, value: usize) -> Self {
         self.texture_storage_mode = Some(value);
         self
     }
 
     #[must_use]
+    /// Sets `MTKTextureLoaderOptionTextureCPUCacheMode`.
     pub const fn with_texture_cpu_cache_mode(mut self, value: usize) -> Self {
         self.texture_cpu_cache_mode = Some(value);
         self
     }
 
     #[must_use]
+    /// Sets `MTKTextureLoaderOptionCubeLayout`.
     pub const fn with_cube_layout(mut self, value: TextureLoaderCubeLayout) -> Self {
         self.cube_layout = Some(value);
         self
     }
 
     #[must_use]
+    /// Sets `MTKTextureLoaderOptionOrigin`.
     pub const fn with_origin(mut self, value: TextureLoaderOrigin) -> Self {
         self.origin = Some(value);
         self
     }
 
     #[must_use]
+    /// Sets `MTKTextureLoaderOptionLoadAsArray`.
     pub const fn with_load_as_array(mut self, value: bool) -> Self {
         self.load_as_array = Some(value);
         self
@@ -432,15 +484,18 @@ where
 
 impl TextureLoader {
     #[must_use]
+    /// Creates an `MTKTextureLoader`.
     pub fn new(device: &MetalDevice) -> Option<Self> {
         unsafe { Self::from_raw(ffi::mtk_texture_loader_new(device.as_ptr())) }
     }
 
     #[must_use]
+    /// Returns the raw pointer from `MTKTextureLoader.device`.
     pub fn device_ptr(&self) -> *mut c_void {
         unsafe { ffi::mtk_texture_loader_device(self.as_ptr()) }
     }
 
+    /// Mirrors `-[MTKTextureLoader newTextureWithContentsOfURL:options:error:]`.
     pub fn new_texture_from_url<P: AsRef<Path>>(
         &self,
         path: P,
@@ -464,6 +519,7 @@ impl TextureLoader {
         texture_from_result(texture, error, "failed to load texture from URL")
     }
 
+    /// Mirrors `-[MTKTextureLoader newTextureWithContentsOfURL:options:completionHandler:]`.
     pub fn new_texture_from_url_with_callback<P, F>(
         &self,
         path: P,
@@ -497,6 +553,7 @@ impl TextureLoader {
         Ok(())
     }
 
+    /// Mirrors `-[MTKTextureLoader newTexturesWithContentsOfURLs:options:error:]`.
     pub fn new_textures_from_urls<P: AsRef<Path>>(
         &self,
         paths: &[P],
@@ -524,6 +581,7 @@ impl TextureLoader {
         Ok(texture_array_from_result(result, error))
     }
 
+    /// Mirrors `-[MTKTextureLoader newTexturesWithContentsOfURLs:options:completionHandler:]`.
     pub fn new_textures_from_urls_with_callback<P, F>(
         &self,
         paths: &[P],
@@ -561,6 +619,7 @@ impl TextureLoader {
         Ok(())
     }
 
+    /// Mirrors `-[MTKTextureLoader newTextureWithName:scaleFactor:bundle:options:error:]`.
     pub fn new_texture_named(
         &self,
         name: &str,
@@ -596,6 +655,7 @@ impl TextureLoader {
         texture_from_result(texture, error, "failed to load named texture")
     }
 
+    /// Mirrors `-[MTKTextureLoader newTextureWithName:scaleFactor:bundle:options:completionHandler:]`.
     pub fn new_texture_named_with_callback<F>(
         &self,
         name: &str,
@@ -640,6 +700,7 @@ impl TextureLoader {
         Ok(())
     }
 
+    /// Mirrors `-[MTKTextureLoader newTextureWithName:scaleFactor:displayGamut:bundle:options:error:]`.
     pub fn new_texture_named_with_display_gamut(
         &self,
         name: &str,
@@ -681,6 +742,7 @@ impl TextureLoader {
         )
     }
 
+    /// Mirrors `-[MTKTextureLoader newTextureWithName:scaleFactor:displayGamut:bundle:options:completionHandler:]`.
     pub fn new_texture_named_with_display_gamut_with_callback<F>(
         &self,
         name: &str,
@@ -727,6 +789,7 @@ impl TextureLoader {
         Ok(())
     }
 
+    /// Mirrors `-[MTKTextureLoader newTexturesWithNames:scaleFactor:bundle:options:error:]`.
     pub fn new_textures_named(
         &self,
         names: &[&str],
@@ -766,6 +829,7 @@ impl TextureLoader {
         Ok(texture_array_from_result(result, error))
     }
 
+    /// Mirrors `-[MTKTextureLoader newTexturesWithNames:scaleFactor:bundle:options:completionHandler:]`.
     pub fn new_textures_named_with_callback<F>(
         &self,
         names: &[&str],
@@ -814,6 +878,7 @@ impl TextureLoader {
         Ok(())
     }
 
+    /// Mirrors `-[MTKTextureLoader newTexturesWithNames:scaleFactor:displayGamut:bundle:options:error:]`.
     pub fn new_textures_named_with_display_gamut(
         &self,
         names: &[&str],
@@ -855,6 +920,7 @@ impl TextureLoader {
         Ok(texture_array_from_result(result, error))
     }
 
+    /// Mirrors `-[MTKTextureLoader newTexturesWithNames:scaleFactor:displayGamut:bundle:options:completionHandler:]`.
     pub fn new_textures_named_with_display_gamut_with_callback<F>(
         &self,
         names: &[&str],
@@ -905,6 +971,7 @@ impl TextureLoader {
         Ok(())
     }
 
+    /// Mirrors `-[MTKTextureLoader newTextureWithData:options:error:]`.
     pub fn new_texture_from_data(
         &self,
         data: &[u8],
@@ -932,6 +999,7 @@ impl TextureLoader {
         texture_from_result(texture, error, "failed to load texture from data")
     }
 
+    /// Mirrors `-[MTKTextureLoader newTextureWithData:options:completionHandler:]`.
     pub fn new_texture_from_data_with_callback<F>(
         &self,
         data: &[u8],
@@ -968,6 +1036,7 @@ impl TextureLoader {
         Ok(())
     }
 
+    /// Mirrors `-[MTKTextureLoader newTextureWithCGImage:options:error:]`.
     pub fn new_texture_from_cgimage(
         &self,
         image: &CGImage,
@@ -989,6 +1058,7 @@ impl TextureLoader {
         texture_from_result(texture, error, "failed to load texture from CGImage")
     }
 
+    /// Mirrors `-[MTKTextureLoader newTextureWithCGImage:options:completionHandler:]`.
     pub fn new_texture_from_cgimage_with_callback<F>(
         &self,
         image: &CGImage,
@@ -1019,6 +1089,7 @@ impl TextureLoader {
         Ok(())
     }
 
+    /// Mirrors `-[MTKTextureLoader newTextureWithMDLTexture:options:error:]`.
     pub fn new_texture_from_model_texture(
         &self,
         texture: &ModelTexture,
@@ -1040,6 +1111,7 @@ impl TextureLoader {
         texture_from_result(texture, error, "failed to load texture from MDLTexture")
     }
 
+    /// Mirrors `-[MTKTextureLoader newTextureWithMDLTexture:options:completionHandler:]`.
     pub fn new_texture_from_model_texture_with_callback<F>(
         &self,
         texture: &ModelTexture,

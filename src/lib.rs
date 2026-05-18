@@ -23,6 +23,7 @@
 #![allow(clippy::cast_sign_loss)]
 
 mod error;
+/// Exposes the low-level `MetalKit` bridge surface used by the safe wrappers.
 pub mod ffi;
 mod mesh;
 mod mesh_buffer;
@@ -55,6 +56,7 @@ pub use texture_loader::{
 };
 pub use view::{ClearColor, Rect, Size, View, ViewDelegate, ViewDelegateCallbacks};
 
+/// Re-exports the primary `MetalKit` wrapper types for convenient glob imports.
 pub mod prelude {
     pub use crate::{
         metal_vertex_descriptor_from_model_io, model_io_vertex_descriptor_from_metal, ClearColor,

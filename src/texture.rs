@@ -8,40 +8,53 @@ use std::ffi::CStr;
 use std::path::Path;
 use std::ptr;
 
-handle_type!(TextureLoader);
+handle_type!(TextureLoader, "Wraps `MTKTextureLoader`.");
 
+/// Exposes `MTKTextureLoaderOption*` dictionary keys.
 pub mod texture_loader_option {
     use super::TextureLoaderOptionKey;
 
+    /// Exposes `MTKTextureLoaderOptionAllocateMipmaps`.
     pub const ALLOCATE_MIPMAPS: TextureLoaderOptionKey =
         TextureLoaderOptionKey("MTKTextureLoaderOptionAllocateMipmaps");
+    /// Exposes `MTKTextureLoaderOptionGenerateMipmaps`.
     pub const GENERATE_MIPMAPS: TextureLoaderOptionKey =
         TextureLoaderOptionKey("MTKTextureLoaderOptionGenerateMipmaps");
+    /// Exposes `MTKTextureLoaderOptionSRGB`.
     pub const SRGB: TextureLoaderOptionKey = TextureLoaderOptionKey("MTKTextureLoaderOptionSRGB");
+    /// Exposes `MTKTextureLoaderOptionTextureUsage`.
     pub const TEXTURE_USAGE: TextureLoaderOptionKey =
         TextureLoaderOptionKey("MTKTextureLoaderOptionTextureUsage");
+    /// Exposes `MTKTextureLoaderOptionTextureStorageMode`.
     pub const TEXTURE_STORAGE_MODE: TextureLoaderOptionKey =
         TextureLoaderOptionKey("MTKTextureLoaderOptionTextureStorageMode");
+    /// Exposes `MTKTextureLoaderOptionTextureCPUCacheMode`.
     pub const TEXTURE_CPU_CACHE_MODE: TextureLoaderOptionKey =
         TextureLoaderOptionKey("MTKTextureLoaderOptionTextureCPUCacheMode");
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// Wraps an `MTKTextureLoaderOption*` dictionary key.
 pub struct TextureLoaderOptionKey(&'static str);
 
 impl TextureLoaderOptionKey {
     #[must_use]
+    /// Returns the wrapped `MTKTextureLoaderOption*` key.
     pub const fn as_str(self) -> &'static str {
         self.0
     }
 }
 
+/// Exposes `MTLCPUCacheMode` values used by `MTKTextureLoader` options.
 pub mod texture_cpu_cache_mode {
+    /// Mirrors `MTLCPUCacheModeDefaultCache`.
     pub const DEFAULT_CACHE: usize = 0;
+    /// Mirrors `MTLCPUCacheModeWriteCombined`.
     pub const WRITE_COMBINED: usize = 1;
 }
 
 #[derive(Debug, Clone, Default)]
+/// Collects option entries for `MTKTextureLoader` requests.
 pub struct TextureLoaderOptions {
     generate_mipmaps: Option<bool>,
     allocate_mipmaps: Option<bool>,
@@ -53,6 +66,7 @@ pub struct TextureLoaderOptions {
 
 impl TextureLoaderOptions {
     #[must_use]
+    /// Creates an empty `MTKTextureLoader` options builder.
     pub const fn new() -> Self {
         Self {
             generate_mipmaps: None,
@@ -65,36 +79,42 @@ impl TextureLoaderOptions {
     }
 
     #[must_use]
+    /// Sets `MTKTextureLoaderOptionGenerateMipmaps`.
     pub const fn with_generate_mipmaps(mut self, value: bool) -> Self {
         self.generate_mipmaps = Some(value);
         self
     }
 
     #[must_use]
+    /// Sets `MTKTextureLoaderOptionAllocateMipmaps`.
     pub const fn with_allocate_mipmaps(mut self, value: bool) -> Self {
         self.allocate_mipmaps = Some(value);
         self
     }
 
     #[must_use]
+    /// Sets `MTKTextureLoaderOptionSRGB`.
     pub const fn with_srgb(mut self, value: bool) -> Self {
         self.srgb = Some(value);
         self
     }
 
     #[must_use]
+    /// Sets `MTKTextureLoaderOptionTextureUsage`.
     pub const fn with_texture_usage(mut self, value: usize) -> Self {
         self.texture_usage = Some(value);
         self
     }
 
     #[must_use]
+    /// Sets `MTKTextureLoaderOptionTextureStorageMode`.
     pub const fn with_texture_storage_mode(mut self, value: usize) -> Self {
         self.texture_storage_mode = Some(value);
         self
     }
 
     #[must_use]
+    /// Sets `MTKTextureLoaderOptionTextureCPUCacheMode`.
     pub const fn with_texture_cpu_cache_mode(mut self, value: usize) -> Self {
         self.texture_cpu_cache_mode = Some(value);
         self
@@ -136,15 +156,18 @@ impl From<&TextureLoaderOptions> for ffi::TextureLoaderOptionsRaw {
 
 impl TextureLoader {
     #[must_use]
+    /// Creates an `MTKTextureLoader`.
     pub fn new(device: &MetalDevice) -> Option<Self> {
         unsafe { Self::from_raw(ffi::mtk_texture_loader_new(device.as_ptr())) }
     }
 
     #[must_use]
+    /// Returns the raw pointer from `MTKTextureLoader.device`.
     pub fn device_ptr(&self) -> *mut c_void {
         unsafe { ffi::mtk_texture_loader_device(self.as_ptr()) }
     }
 
+    /// Mirrors `-[MTKTextureLoader newTextureWithContentsOfURL:options:error:]`.
     pub fn new_texture_from_url<P: AsRef<Path>>(
         &self,
         path: P,
@@ -166,6 +189,7 @@ impl TextureLoader {
         texture_from_result(texture, error, "failed to load texture from URL")
     }
 
+    /// Mirrors `-[MTKTextureLoader newTextureWithName:scaleFactor:bundle:options:error:]`.
     pub fn new_texture_named(
         &self,
         name: &str,
@@ -199,6 +223,7 @@ impl TextureLoader {
         texture_from_result(texture, error, "failed to load named texture")
     }
 
+    /// Mirrors `-[MTKTextureLoader newTextureWithData:options:error:]`.
     pub fn new_texture_from_data(
         &self,
         data: &[u8],
@@ -224,6 +249,7 @@ impl TextureLoader {
         texture_from_result(texture, error, "failed to load texture from data")
     }
 
+    /// Mirrors `-[MTKTextureLoader newTextureWithCGImage:options:error:]`.
     pub fn new_texture_from_cgimage(
         &self,
         image: &CGImage,

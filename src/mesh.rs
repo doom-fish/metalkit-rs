@@ -7,15 +7,19 @@ use crate::submesh::Submesh;
 use apple_metal::MetalDevice;
 use std::ptr;
 
-handle_type!(Mesh);
+handle_type!(Mesh, "Wraps `MTKMesh`.");
 
 #[derive(Debug, Clone)]
+/// Mirrors the paired `MTKMesh` and `MDLMesh` arrays returned by asset conversion APIs.
 pub struct MeshAssetConversion {
+    /// Contains the converted `MTKMesh` values.
     pub meshes: Vec<Mesh>,
+    /// Contains the source `MDLMesh` values paired with `meshes`.
     pub source_meshes: Vec<ModelMesh>,
 }
 
 impl Mesh {
+    /// Creates an `MTKMesh` from an `MDLMesh`.
     pub fn from_model_mesh(mesh: &ModelMesh, device: &MetalDevice) -> Result<Self, MetalKitError> {
         let mut error = ptr::null_mut();
         let raw_mesh = unsafe {
@@ -32,6 +36,7 @@ impl Mesh {
         }
     }
 
+    /// Converts every mesh in an `MDLAsset` into `MTKMesh` values.
     pub fn new_meshes_from_asset(
         asset: &ModelAsset,
         device: &MetalDevice,
@@ -91,15 +96,18 @@ impl Mesh {
     }
 
     #[must_use]
+    /// Returns `MTKMesh.vertexCount`.
     pub fn vertex_count(&self) -> usize {
         unsafe { ffi::mtk_mesh_vertex_count(self.as_ptr()) }
     }
 
     #[must_use]
+    /// Returns `MTKMesh.name`.
     pub fn name(&self) -> Option<String> {
         take_c_string(unsafe { ffi::mtk_mesh_get_name(self.as_ptr()) })
     }
 
+    /// Sets `MTKMesh.name`.
     pub fn set_name(&self, name: &str) {
         if let Some(name) = cstring_from_str(name) {
             unsafe { ffi::mtk_mesh_set_name(self.as_ptr(), name.as_ptr()) };
@@ -107,6 +115,7 @@ impl Mesh {
     }
 
     #[must_use]
+    /// Returns `MTKMesh.vertexBuffers`.
     pub fn vertex_buffers(&self) -> Vec<MeshBuffer> {
         let count = unsafe { ffi::mtk_mesh_vertex_buffer_count(self.as_ptr()) };
         (0..count)
@@ -117,11 +126,13 @@ impl Mesh {
     }
 
     #[must_use]
+    /// Returns `MTKMesh.vertexDescriptor`.
     pub fn vertex_descriptor(&self) -> Option<ModelVertexDescriptor> {
         unsafe { ModelVertexDescriptor::from_raw(ffi::mtk_mesh_vertex_descriptor(self.as_ptr())) }
     }
 
     #[must_use]
+    /// Returns `MTKMesh.submeshes`.
     pub fn submeshes(&self) -> Vec<Submesh> {
         let count = unsafe { ffi::mtk_mesh_submesh_count(self.as_ptr()) };
         (0..count)

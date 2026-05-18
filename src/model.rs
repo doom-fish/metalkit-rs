@@ -6,28 +6,39 @@ use core::ffi::c_void;
 use std::ffi::CStr;
 use std::ptr;
 
-handle_type!(MeshBufferAllocator);
-handle_type!(MeshBuffer);
-handle_type!(ModelMesh);
-handle_type!(Mesh);
-handle_type!(Submesh);
+handle_type!(MeshBufferAllocator, "Wraps `MTKMeshBufferAllocator`.");
+handle_type!(MeshBuffer, "Wraps `MTKMeshBuffer`.");
+handle_type!(ModelMesh, "Wraps `MDLMesh`.");
+handle_type!(Mesh, "Wraps `MTKMesh`.");
+handle_type!(Submesh, "Wraps `MTKSubmesh`.");
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(i64)]
+/// Mirrors `MDLGeometryType`.
 pub enum GeometryType {
+    /// Mirrors `MDLGeometryTypePoints`.
     Points = 0,
+    /// Mirrors `MDLGeometryTypeLines`.
     Lines = 1,
+    /// Mirrors `MDLGeometryTypeTriangles`.
     Triangles = 2,
+    /// Mirrors `MDLGeometryTypeTriangleStrips`.
     TriangleStrips = 3,
+    /// Mirrors `MDLGeometryTypeQuads`.
     Quads = 4,
+    /// Mirrors `MDLGeometryTypeVariableTopology`.
     VariableTopology = 5,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(usize)]
+/// Mirrors `MTKMeshBufferType`.
 pub enum MeshBufferType {
+    /// Mirrors `MTKMeshBufferTypeVertex`.
     Vertex = 1,
+    /// Mirrors `MTKMeshBufferTypeIndex`.
     Index = 2,
+    /// Mirrors `MTKMeshBufferTypeCustom`.
     Custom = 3,
 }
 
@@ -44,11 +55,17 @@ impl MeshBufferType {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(usize)]
+/// Mirrors `MTLPrimitiveType` as exposed by `MTKSubmesh`.
 pub enum PrimitiveType {
+    /// Mirrors `MTLPrimitiveTypePoint`.
     Point = 0,
+    /// Mirrors `MTLPrimitiveTypeLine`.
     Line = 1,
+    /// Mirrors `MTLPrimitiveTypeLineStrip`.
     LineStrip = 2,
+    /// Mirrors `MTLPrimitiveTypeTriangle`.
     Triangle = 3,
+    /// Mirrors `MTLPrimitiveTypeTriangleStrip`.
     TriangleStrip = 4,
 }
 
@@ -67,8 +84,11 @@ impl PrimitiveType {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(usize)]
+/// Mirrors `MTLIndexType` as exposed by `MTKSubmesh`.
 pub enum IndexType {
+    /// Mirrors `MTLIndexTypeUInt16`.
     UInt16 = 0,
+    /// Mirrors `MTLIndexTypeUInt32`.
     UInt32 = 1,
 }
 
@@ -84,16 +104,19 @@ impl IndexType {
 
 impl MeshBufferAllocator {
     #[must_use]
+    /// Creates an `MTKMeshBufferAllocator`.
     pub fn new(device: &MetalDevice) -> Option<Self> {
         unsafe { Self::from_raw(ffi::mtk_mesh_buffer_allocator_new(device.as_ptr())) }
     }
 
     #[must_use]
+    /// Returns the raw pointer from `MTKMeshBufferAllocator.device`.
     pub fn device_ptr(&self) -> *mut c_void {
         unsafe { ffi::mtk_mesh_buffer_allocator_device(self.as_ptr()) }
     }
 
     #[must_use]
+    /// Calls `-[MTKMeshBufferAllocator newBufferWithLength:type:]`.
     pub fn new_buffer(&self, length: usize, buffer_type: MeshBufferType) -> Option<MeshBuffer> {
         unsafe {
             MeshBuffer::from_raw(ffi::mtk_mesh_buffer_allocator_new_buffer(
@@ -105,6 +128,7 @@ impl MeshBufferAllocator {
     }
 
     #[must_use]
+    /// Calls `-[MTKMeshBufferAllocator newBufferWithData:type:]`.
     pub fn new_buffer_with_data(
         &self,
         data: &[u8],
@@ -128,26 +152,31 @@ impl MeshBufferAllocator {
 
 impl MeshBuffer {
     #[must_use]
+    /// Returns `MTKMeshBuffer.length`.
     pub fn length(&self) -> usize {
         unsafe { ffi::mtk_mesh_buffer_length(self.as_ptr()) }
     }
 
     #[must_use]
+    /// Returns `MTKMeshBuffer.offset`.
     pub fn offset(&self) -> usize {
         unsafe { ffi::mtk_mesh_buffer_offset(self.as_ptr()) }
     }
 
     #[must_use]
+    /// Returns `MTKMeshBuffer.type`.
     pub fn buffer_type(&self) -> Option<MeshBufferType> {
         MeshBufferType::from_raw(unsafe { ffi::mtk_mesh_buffer_type(self.as_ptr()) })
     }
 
     #[must_use]
+    /// Returns the raw `MTLBuffer` pointer from `MTKMeshBuffer.buffer`.
     pub fn metal_buffer_ptr(&self) -> *mut c_void {
         unsafe { ffi::mtk_mesh_buffer_metal_buffer(self.as_ptr()) }
     }
 
     #[must_use]
+    /// Copies bytes from `MTKMeshBuffer` into the provided slice.
     pub fn copy_bytes(&self, dst: &mut [u8]) -> usize {
         let dst_ptr = if dst.is_empty() {
             ptr::null_mut()
@@ -158,10 +187,12 @@ impl MeshBuffer {
     }
 
     #[must_use]
+    /// Returns `MTKMeshBuffer.name`.
     pub fn name(&self) -> Option<String> {
         take_c_string(unsafe { ffi::mtk_mesh_buffer_get_name(self.as_ptr()) })
     }
 
+    /// Sets `MTKMeshBuffer.name`.
     pub fn set_name(&self, name: &str) {
         if let Some(name) = cstring_from_str(name) {
             unsafe { ffi::mtk_mesh_buffer_set_name(self.as_ptr(), name.as_ptr()) };
@@ -170,6 +201,7 @@ impl MeshBuffer {
 }
 
 impl ModelMesh {
+    /// Creates an `MDLMesh` box with MetalKit-compatible allocation.
     pub fn new_box(
         extent: [f32; 3],
         segments: [u32; 3],
@@ -221,15 +253,18 @@ impl ModelMesh {
     }
 
     #[must_use]
+    /// Returns `MDLMesh.vertexCount`.
     pub fn vertex_count(&self) -> usize {
         unsafe { ffi::mtk_model_mesh_vertex_count(self.as_ptr()) }
     }
 
     #[must_use]
+    /// Returns `MDLMesh.name`.
     pub fn name(&self) -> Option<String> {
         take_c_string(unsafe { ffi::mtk_model_mesh_get_name(self.as_ptr()) })
     }
 
+    /// Sets `MDLMesh.name`.
     pub fn set_name(&self, name: &str) {
         if let Some(name) = cstring_from_str(name) {
             unsafe { ffi::mtk_model_mesh_set_name(self.as_ptr(), name.as_ptr()) };
@@ -237,12 +272,14 @@ impl ModelMesh {
     }
 
     #[must_use]
+    /// Returns the wrapped raw `MDLMesh` pointer.
     pub const fn as_mdl_mesh_ptr(&self) -> *mut c_void {
         self.ptr
     }
 }
 
 impl Mesh {
+    /// Creates an `MTKMesh` from an `MDLMesh`.
     pub fn from_model_mesh(mesh: &ModelMesh, device: &MetalDevice) -> Result<Self, MetalKitError> {
         let mut error = ptr::null_mut();
         let raw_mesh = unsafe {
@@ -276,15 +313,18 @@ impl Mesh {
     }
 
     #[must_use]
+    /// Returns `MTKMesh.vertexCount`.
     pub fn vertex_count(&self) -> usize {
         unsafe { ffi::mtk_mesh_vertex_count(self.as_ptr()) }
     }
 
     #[must_use]
+    /// Returns `MTKMesh.name`.
     pub fn name(&self) -> Option<String> {
         take_c_string(unsafe { ffi::mtk_mesh_get_name(self.as_ptr()) })
     }
 
+    /// Sets `MTKMesh.name`.
     pub fn set_name(&self, name: &str) {
         if let Some(name) = cstring_from_str(name) {
             unsafe { ffi::mtk_mesh_set_name(self.as_ptr(), name.as_ptr()) };
@@ -292,6 +332,7 @@ impl Mesh {
     }
 
     #[must_use]
+    /// Returns `MTKMesh.vertexBuffers`.
     pub fn vertex_buffers(&self) -> Vec<MeshBuffer> {
         let count = unsafe { ffi::mtk_mesh_vertex_buffer_count(self.as_ptr()) };
         (0..count)
@@ -302,6 +343,7 @@ impl Mesh {
     }
 
     #[must_use]
+    /// Returns `MTKMesh.submeshes`.
     pub fn submeshes(&self) -> Vec<Submesh> {
         let count = unsafe { ffi::mtk_mesh_submesh_count(self.as_ptr()) };
         (0..count)
@@ -314,30 +356,36 @@ impl Mesh {
 
 impl Submesh {
     #[must_use]
+    /// Returns `MTKSubmesh.primitiveType`.
     pub fn primitive_type(&self) -> Option<PrimitiveType> {
         PrimitiveType::from_raw(unsafe { ffi::mtk_submesh_primitive_type(self.as_ptr()) })
     }
 
     #[must_use]
+    /// Returns `MTKSubmesh.indexType`.
     pub fn index_type(&self) -> Option<IndexType> {
         IndexType::from_raw(unsafe { ffi::mtk_submesh_index_type(self.as_ptr()) })
     }
 
     #[must_use]
+    /// Returns `MTKSubmesh.indexBuffer`.
     pub fn index_buffer(&self) -> Option<MeshBuffer> {
         unsafe { MeshBuffer::from_raw(ffi::mtk_submesh_index_buffer(self.as_ptr())) }
     }
 
     #[must_use]
+    /// Returns `MTKSubmesh.indexCount`.
     pub fn index_count(&self) -> usize {
         unsafe { ffi::mtk_submesh_index_count(self.as_ptr()) }
     }
 
     #[must_use]
+    /// Returns `MTKSubmesh.name`.
     pub fn name(&self) -> Option<String> {
         take_c_string(unsafe { ffi::mtk_submesh_get_name(self.as_ptr()) })
     }
 
+    /// Sets `MTKSubmesh.name`.
     pub fn set_name(&self, name: &str) {
         if let Some(name) = cstring_from_str(name) {
             unsafe { ffi::mtk_submesh_set_name(self.as_ptr(), name.as_ptr()) };

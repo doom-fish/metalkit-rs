@@ -2,12 +2,14 @@ use std::error::Error;
 use std::fmt;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+/// Represents an `NSError`-style failure returned by a `MetalKit` API.
 pub struct MetalKitError {
     message: String,
 }
 
 impl MetalKitError {
     #[must_use]
+    /// Creates a new `MetalKitError` message wrapper.
     pub fn new(message: impl Into<String>) -> Self {
         Self {
             message: message.into(),
