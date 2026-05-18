@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.2.4] - 2026-05-18
+
+- Widen apple-cf version bound to `<0.10` so 0.9.x resolves.
+
 ## 0.2.3
 
 - Fixed version constraints for `apple-cf` and `apple-metal` dependencies
