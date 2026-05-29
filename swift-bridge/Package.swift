@@ -15,7 +15,6 @@ let package = Package(
     targets: [
         .target(
             name: "MetalKitBridge",
-            path: "Sources/MetalKitBridge",
-            publicHeadersPath: "include")
+            path: "Sources/MetalKitBridge")
     ]
 )

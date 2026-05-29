@@ -1,4 +1,0 @@
-module MetalKitBridge {
-    header "MetalKitBridge.h"
-    export *
-}

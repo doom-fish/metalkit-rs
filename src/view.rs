@@ -125,7 +125,9 @@ unsafe extern "C" fn view_draw_trampoline(user_data: *mut c_void, view: *mut c_v
     let state = unsafe { &mut *user_data.cast::<DelegateState>() };
     if let Some(callback) = state.draw.as_mut() {
         let view = unsafe { View::from_raw_borrowed(view) };
-        callback(&view);
+        // A panic unwinding across the `extern "C"` boundary into Swift is UB,
+        // so the user closure is contained here.
+        apple_cf::utils::panic_safe::catch_user_panic("MTKViewDelegate draw", || callback(&view));
     }
 }
 
@@ -142,7 +144,11 @@ unsafe extern "C" fn view_resize_trampoline(
     let state = unsafe { &mut *user_data.cast::<DelegateState>() };
     if let Some(callback) = state.resize.as_mut() {
         let view = unsafe { View::from_raw_borrowed(view) };
-        callback(&view, Size { width, height });
+        // A panic unwinding across the `extern "C"` boundary into Swift is UB,
+        // so the user closure is contained here.
+        apple_cf::utils::panic_safe::catch_user_panic("MTKViewDelegate resize", || {
+            callback(&view, Size { width, height });
+        });
     }
 }
 

@@ -27,6 +27,18 @@ private let optionCubeLayout: UInt32 = 1 << 6
 private let optionOrigin: UInt32 = 1 << 7
 private let optionLoadAsArray: UInt32 = 1 << 8
 
+/// Cross-language ABI check for `TextureLoaderOptionsRaw`.
+///
+/// Returns `true` only if the Swift `MemoryLayout` (size, stride and
+/// alignment) matches the values pinned on the Rust side. Verified by the
+/// `ffi_layout_matches_swift` test in `src/ffi/texture_loader.rs`.
+@_cdecl("mtk_verify_ffi_layout")
+public func verifyFFILayout() -> Bool {
+    return MemoryLayout<TextureLoaderOptionsRaw>.size == 48
+        && MemoryLayout<TextureLoaderOptionsRaw>.stride == 48
+        && MemoryLayout<TextureLoaderOptionsRaw>.alignment == 8
+}
+
 final class MTKTextureArrayBox: NSObject {
     let textures: [AnyObject?]
 

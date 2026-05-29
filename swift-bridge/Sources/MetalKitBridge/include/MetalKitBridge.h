@@ -1,3 +1,0 @@
-#ifndef METALKIT_BRIDGE_H
-#define METALKIT_BRIDGE_H
-#endif
