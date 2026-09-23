@@ -629,13 +629,14 @@ public func mtk_texture_loader_new_texture_from_data(
     _ optionsPtr: UnsafeRawPointer?,
     _ outError: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
 ) -> UnsafeMutableRawPointer? {
-    guard let loader: MTKTextureLoader = mtkBorrow(loaderPtr, as: MTKTextureLoader.self) else {
-        outError?.pointee = mtkDup("invalid MTKTextureLoader")
+    guard let loader: MTKTextureLoader = mtkBorrow(loaderPtr, as: MTKTextureLoader.self),
+          let data = mtkData(bytes, count: len)
+    else {
+        outError?.pointee = mtkDup("invalid MTKTextureLoader or data")
         return nil
     }
 
     let options = mtkTextureLoaderOptions(from: optionsPtr)
-    let data = len == 0 ? Data() : Data(bytes: bytes!, count: len)
     do {
         let texture = try loader.newTexture(data: data, options: options)
         outError?.pointee = nil
@@ -655,13 +656,18 @@ public func mtk_texture_loader_new_texture_from_data_with_callback(
     _ callback: MTKTextureLoaderRustCallback?,
     _ userData: UnsafeMutableRawPointer?
 ) {
-    guard let loader: MTKTextureLoader = mtkBorrow(loaderPtr, as: MTKTextureLoader.self) else {
-        mtkCompleteTextureLoadWithMessage(callback: callback, userData: userData, message: "invalid MTKTextureLoader")
+    guard let loader: MTKTextureLoader = mtkBorrow(loaderPtr, as: MTKTextureLoader.self),
+          let data = mtkData(bytes, count: len)
+    else {
+        mtkCompleteTextureLoadWithMessage(
+            callback: callback,
+            userData: userData,
+            message: "invalid MTKTextureLoader or data"
+        )
         return
     }
 
     let options = mtkTextureLoaderOptions(from: optionsPtr)
-    let data = len == 0 ? Data() : Data(bytes: bytes!, count: len)
     loader.newTexture(data: data, options: options) { texture, error in
         mtkCompleteTextureLoad(callback: callback, userData: userData, texture: texture, error: error)
     }
@@ -675,14 +681,13 @@ public func mtk_texture_loader_new_texture_from_cgimage(
     _ outError: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
 ) -> UnsafeMutableRawPointer? {
     guard let loader: MTKTextureLoader = mtkBorrow(loaderPtr, as: MTKTextureLoader.self),
-          let imagePtr
+          let image = mtkCGImage(imagePtr)
     else {
         outError?.pointee = mtkDup("invalid MTKTextureLoader or CGImage")
         return nil
     }
 
     let options = mtkTextureLoaderOptions(from: optionsPtr)
-    let image = Unmanaged<AnyObject>.fromOpaque(imagePtr).takeUnretainedValue() as! CGImage
 
     do {
         let texture = try loader.newTexture(cgImage: image, options: options)
@@ -703,7 +708,7 @@ public func mtk_texture_loader_new_texture_from_cgimage_with_callback(
     _ userData: UnsafeMutableRawPointer?
 ) {
     guard let loader: MTKTextureLoader = mtkBorrow(loaderPtr, as: MTKTextureLoader.self),
-          let imagePtr
+          let image = mtkCGImage(imagePtr)
     else {
         mtkCompleteTextureLoadWithMessage(
             callback: callback,
@@ -714,7 +719,6 @@ public func mtk_texture_loader_new_texture_from_cgimage_with_callback(
     }
 
     let options = mtkTextureLoaderOptions(from: optionsPtr)
-    let image = Unmanaged<AnyObject>.fromOpaque(imagePtr).takeUnretainedValue() as! CGImage
     loader.newTexture(cgImage: image, options: options) { texture, error in
         mtkCompleteTextureLoad(callback: callback, userData: userData, texture: texture, error: error)
     }

@@ -42,10 +42,11 @@ public func mtk_mesh_buffer_allocator_new_buffer_with_data(
     _ len: Int,
     _ bufferType: Int
 ) -> UnsafeMutableRawPointer? {
-    guard let allocator: MTKMeshBufferAllocator = mtkBorrow(allocatorPtr, as: MTKMeshBufferAllocator.self) else {
+    guard let allocator: MTKMeshBufferAllocator = mtkBorrow(allocatorPtr, as: MTKMeshBufferAllocator.self),
+          let data = mtkData(bytes, count: len)
+    else {
         return nil
     }
-    let data = len == 0 ? Data() : Data(bytes: bytes!, count: len)
     let buffer = allocator.newBuffer(with: data, type: mtkMeshBufferType(from: bufferType)) as? MTKMeshBuffer
     return mtkTakeRetained(buffer)
 }

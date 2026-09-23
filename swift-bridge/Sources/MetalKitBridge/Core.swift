@@ -41,6 +41,19 @@ func mtkBorrow<T>(_ ptr: UnsafeMutableRawPointer?, as _: T.Type) -> T? {
     return Unmanaged<AnyObject>.fromOpaque(ptr).takeUnretainedValue() as? T
 }
 
+func mtkData(_ bytes: UnsafeRawPointer?, count: Int) -> Data? {
+    guard count > 0 else { return count == 0 ? Data() : nil }
+    guard let bytes else { return nil }
+    return Data(bytes: bytes, count: count)
+}
+
+func mtkCGImage(_ ptr: UnsafeMutableRawPointer?) -> CGImage? {
+    guard let ptr else { return nil }
+    let object = Unmanaged<AnyObject>.fromOpaque(ptr).takeUnretainedValue()
+    guard CFGetTypeID(object) == CGImage.typeID else { return nil }
+    return Unmanaged<CGImage>.fromOpaque(ptr).takeUnretainedValue()
+}
+
 func mtkDup(_ value: String?) -> UnsafeMutablePointer<CChar>? {
     guard let value else { return nil }
     return strdup(value)
