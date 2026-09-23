@@ -12,7 +12,7 @@ pub(crate) const OPTION_ORIGIN: u32 = 1 << 7;
 pub(crate) const OPTION_LOAD_AS_ARRAY: u32 = 1 << 8;
 
 #[repr(C)]
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy)]
 pub struct TextureLoaderOptionsRaw {
     pub flags: u32,
     pub generate_mipmaps: u8,
@@ -26,14 +26,30 @@ pub struct TextureLoaderOptionsRaw {
     pub origin: *const c_char,
 }
 
+impl Default for TextureLoaderOptionsRaw {
+    fn default() -> Self {
+        Self {
+            flags: 0,
+            generate_mipmaps: 0,
+            allocate_mipmaps: 0,
+            srgb: 0,
+            load_as_array: 0,
+            texture_usage: 0,
+            texture_storage_mode: 0,
+            texture_cpu_cache_mode: 0,
+            cube_layout: core::ptr::null(),
+            origin: core::ptr::null(),
+        }
+    }
+}
+
 // `TextureLoaderOptionsRaw` is passed by pointer across the Rust <-> Swift
 // `@_cdecl` FFI boundary (Swift reads it as `TextureLoaderOptionsRaw` via
 // `assumingMemoryBound`). If its size or alignment drifts from what the Swift
 // side expects, the option marshalling silently corrupts. These compile-time
 // assertions pin the layout so accidental field reordering / type changes fail
-// the build immediately. MSRV is 1.76, so `offset_of!` (1.77) is unavailable;
-// we pin size/align only. The cross-language `mtk_verify_ffi_layout` check
-// guards the Swift side agreeing with these values.
+// the build immediately. They pin size and alignment only. The cross-language
+// `mtk_verify_ffi_layout` check guards the Swift side agreeing with these values.
 const _: () = assert!(core::mem::size_of::<TextureLoaderOptionsRaw>() == 48);
 const _: () = assert!(core::mem::align_of::<TextureLoaderOptionsRaw>() == 8);
 

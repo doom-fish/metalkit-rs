@@ -9,7 +9,7 @@ description = "Safe Rust bindings for Apple's MetalKit framework — MTKView, te
 authors = ["Per Johansson <per@doom.fish>"]
 keywords = ["metalkit", "metal", "modelio", "macos", "apple"]
 categories = ["api-bindings", "graphics", "os::macos-apis"]
-rust-version = "1.76"
+rust-version = "1.82"
 readme = "README.md"
 build = "build.rs"
 include = [
@@ -45,8 +45,9 @@ cargo-clippy = []
 libc = "0.2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-apple-cf = { path = "../apple-cf-rs", version = ">=0.7, <0.10", features = ["cg"] }
-apple-metal = { path = "../apple-metal-rs", version = ">=0.8, <1.0" }
+apple-cf = { path = "../apple-cf-rs", version = ">=0.11, <0.12", features = ["cg"] }
+apple-metal = { path = "../apple-metal-rs", version = ">=0.10, <0.11" }
+doom-fish-utils = { path = "../doom-fish-utils", version = ">=0.4.1, <0.5" }
 
 [package.metadata.docs.rs]
 all-features = true
