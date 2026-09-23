@@ -1,12 +1,15 @@
 # metalkit-rs coverage audit v2 (vs MacOSX26.2.sdk)
 
+> **What this measures:** a symbol is VERIFIED when a named Rust item exists for it. Three entries (`MTKTextureLoader.device`, `MTKMeshBufferAllocator.device`, `MTKMeshBuffer.buffer`) are only raw pointer getters and are not safe coverage, so 105 of the 108 symbols have a safe wrapper. The table was generated against `MacOSX26.2.sdk` and has not been regenerated.
+
 SDK_PUBLIC_SYMBOLS: 108
 VERIFIED: 108
+RAW_POINTER_ONLY: 3
 GAPS: 0
 EXEMPT: 0
 COVERAGE_PCT: 100.00%
 
-Audited headers: `MTKView.h`, `MTKTextureLoader.h`, and `MTKModel.h`. `MetalKit.h` only re-exports those headers, and `MTKDefines.h` only contributes helper macros. V2 verification confirms all 108 public macOS symbols from the MetalKit framework are exposed by the crate through safe Rust wrappers or FFI bindings.
+Audited headers: `MTKView.h`, `MTKTextureLoader.h`, and `MTKModel.h`. `MetalKit.h` only re-exports those headers, and `MTKDefines.h` only contributes helper macros. V2 verification found a Rust item for all 108 public macOS symbols; three of them are raw pointer getters rather than safe wrappers (see the note above).
 
 ## 🟢 VERIFIED
 | Symbol | Kind | Header | Wrapped by |
@@ -15,9 +18,9 @@ Audited headers: `MTKView.h`, `MTKTextureLoader.h`, and `MTKModel.h`. `MetalKit.
 | `MTKViewDelegate` | protocol | `MTKView.h` | `ViewDelegate`; `ViewDelegateCallbacks` |
 | `MTKView.initWithFrame(_:device:)` | initializer | `MTKView.h` | `View::new(...)` |
 | `MTKView.initWithCoder(_)` | initializer | `MTKView.h` | `View::archive_round_trip()` (indirect `NSCoder` round-trip) |
-| `MTKView.delegate` | property | `MTKView.h` | `View::delegate_ptr()`; `View::set_delegate(...)` |
-| `MTKView.device` | property | `MTKView.h` | `View::device_ptr()`; `View::set_device(...)` |
-| `MTKView.currentDrawable` | property | `MTKView.h` | `View::current_drawable_ptr()` (raw `CAMetalDrawable` pointer) |
+| `MTKView.delegate` | property | `MTKView.h` | `View::set_delegate(...)`; `View::delegate_ptr()` (+0 identity pointer) |
+| `MTKView.device` | property | `MTKView.h` | `View::device()` (`MetalDevice`); `View::set_device(...)` |
+| `MTKView.currentDrawable` | property | `MTKView.h` | `View::current_drawable()` (apple-metal `MetalDrawable`, an opaque handle without methods) |
 | `MTKView.framebufferOnly` | property | `MTKView.h` | `View::framebuffer_only()`; `View::set_framebuffer_only(...)` |
 | `MTKView.depthStencilAttachmentTextureUsage` | property | `MTKView.h` | `View::depth_stencil_attachment_texture_usage()`; `View::set_depth_stencil_attachment_texture_usage(...)` |
 | `MTKView.multisampleColorAttachmentTextureUsage` | property | `MTKView.h` | `View::multisample_color_attachment_texture_usage()`; `View::set_multisample_color_attachment_texture_usage(...)` |
@@ -29,19 +32,19 @@ Audited headers: `MTKView.h`, `MTKTextureLoader.h`, and `MTKModel.h`. `MetalKit.
 | `MTKView.clearColor` | property | `MTKView.h` | `View::clear_color()`; `View::set_clear_color(...)` |
 | `MTKView.clearDepth` | property | `MTKView.h` | `View::clear_depth()`; `View::set_clear_depth(...)` |
 | `MTKView.clearStencil` | property | `MTKView.h` | `View::clear_stencil()`; `View::set_clear_stencil(...)` |
-| `MTKView.depthStencilTexture` | property | `MTKView.h` | `View::depth_stencil_texture_ptr()` (raw `MTLTexture` pointer) |
-| `MTKView.multisampleColorTexture` | property | `MTKView.h` | `View::multisample_color_texture_ptr()` (raw `MTLTexture` pointer) |
+| `MTKView.depthStencilTexture` | property | `MTKView.h` | `View::depth_stencil_texture()` (`MetalTexture`) |
+| `MTKView.multisampleColorTexture` | property | `MTKView.h` | `View::multisample_color_texture()` (`MetalTexture`) |
 | `MTKView.releaseDrawables()` | instance method | `MTKView.h` | `View::release_drawables()` |
-| `MTKView.currentRenderPassDescriptor` | property | `MTKView.h` | `View::current_render_pass_descriptor_ptr()` (raw `MTLRenderPassDescriptor` pointer) |
-| `MTKView.currentMTL4RenderPassDescriptor` | property | `MTKView.h` | `View::current_mtl4_render_pass_descriptor_ptr()` (raw `MTL4RenderPassDescriptor` pointer) |
+| `MTKView.currentRenderPassDescriptor` | property | `MTKView.h` | `View::current_render_pass_descriptor()` (apple-metal `MetalRenderPassDescriptor`, an opaque handle without methods) |
+| `MTKView.currentMTL4RenderPassDescriptor` | property | `MTKView.h` | `View::current_mtl4_render_pass_descriptor()` (apple-metal `Metal4RenderPassDescriptor`; error before macOS 26) |
 | `MTKView.preferredFramesPerSecond` | property | `MTKView.h` | `View::preferred_frames_per_second()`; `View::set_preferred_frames_per_second(...)` |
 | `MTKView.enableSetNeedsDisplay` | property | `MTKView.h` | `View::enable_set_needs_display()`; `View::set_enable_set_needs_display(...)` |
 | `MTKView.autoResizeDrawable` | property | `MTKView.h` | `View::auto_resize_drawable()`; `View::set_auto_resize_drawable(...)` |
 | `MTKView.drawableSize` | property | `MTKView.h` | `View::drawable_size()`; `View::set_drawable_size(...)` |
 | `MTKView.preferredDrawableSize` | property | `MTKView.h` | `View::preferred_drawable_size()` |
-| `MTKView.preferredDevice` | property | `MTKView.h` | `View::preferred_device_ptr()` (raw `MTLDevice` pointer) |
+| `MTKView.preferredDevice` | property | `MTKView.h` | `View::preferred_device()` (`MetalDevice`) |
 | `MTKView.paused` | property | `MTKView.h` | `View::is_paused()`; `View::set_paused(...)` |
-| `MTKView.colorspace` | property | `MTKView.h` | `View::colorspace_ptr()`; `View::set_colorspace(...)` |
+| `MTKView.colorspace` | property | `MTKView.h` | `View::colorspace()` (`CGColorSpace`); `View::set_colorspace(...)` |
 | `MTKView.draw()` | instance method | `MTKView.h` | `View::draw()` |
 | `MTKViewDelegate.mtkView(_:drawableSizeWillChange:)` | delegate callback | `MTKView.h` | `ViewDelegateCallbacks::on_drawable_size_will_change(...)`; `View::notify_delegate_drawable_size_will_change()` |
 | `MTKViewDelegate.drawInMTKView(_)` | delegate callback | `MTKView.h` | `ViewDelegateCallbacks::on_draw(...)`; `View::notify_delegate_draw()` |
@@ -65,7 +68,7 @@ Audited headers: `MTKView.h`, `MTKTextureLoader.h`, and `MTKModel.h`. `MetalKit.
 | `MTKTextureLoaderOriginBottomLeft` | constant | `MTKTextureLoader.h` | `texture_loader_origin::BOTTOM_LEFT` |
 | `MTKTextureLoaderOriginFlippedVertically` | constant | `MTKTextureLoader.h` | `texture_loader_origin::FLIPPED_VERTICALLY` |
 | `MTKTextureLoaderOptionLoadAsArray` | constant | `MTKTextureLoader.h` | `texture_loader_option::LOAD_AS_ARRAY`; `TextureLoaderOptions::with_load_as_array(...)` |
-| `MTKTextureLoader.device` | property | `MTKTextureLoader.h` | `TextureLoader::device_ptr()` (raw `MTLDevice` pointer) |
+| `MTKTextureLoader.device` | property | `MTKTextureLoader.h` | `TextureLoader::device_ptr()` (raw `MTLDevice` pointer only; not safe coverage) |
 | `MTKTextureLoader.initWithDevice(_)` | initializer | `MTKTextureLoader.h` | `TextureLoader::new(...)` |
 | `MTKTextureLoaderCallback` | typealias | `MTKTextureLoader.h` | `TextureLoaderCallback` |
 | `MTKTextureLoaderArrayCallback` | typealias | `MTKTextureLoader.h` | `TextureLoaderArrayCallback` |
@@ -90,12 +93,12 @@ Audited headers: `MTKView.h`, `MTKTextureLoader.h`, and `MTKModel.h`. `MetalKit.
 | `MTKModelError` | typealias | `MTKModel.h` | `ModelError` |
 | `MTKMeshBufferAllocator` | interface | `MTKModel.h` | `MeshBufferAllocator` |
 | `MTKMeshBufferAllocator.initWithDevice(_)` | initializer | `MTKModel.h` | `MeshBufferAllocator::new(...)` |
-| `MTKMeshBufferAllocator.device` | property | `MTKModel.h` | `MeshBufferAllocator::device_ptr()` (raw `MTLDevice` pointer) |
+| `MTKMeshBufferAllocator.device` | property | `MTKModel.h` | `MeshBufferAllocator::device_ptr()` (raw `MTLDevice` pointer only; not safe coverage) |
 | `MTKMeshBuffer` | interface | `MTKModel.h` | `MeshBuffer` |
 | `MTKMeshBuffer.length` | property | `MTKModel.h` | `MeshBuffer::length()` |
 | `MTKMeshBuffer.allocator` | property | `MTKModel.h` | `MeshBuffer::allocator()` |
 | `MTKMeshBuffer.zone` | property | `MTKModel.h` | `MeshBuffer::zone()` |
-| `MTKMeshBuffer.buffer` | property | `MTKModel.h` | `MeshBuffer::metal_buffer_ptr()` (raw `MTLBuffer` pointer) |
+| `MTKMeshBuffer.buffer` | property | `MTKModel.h` | `MeshBuffer::metal_buffer_ptr()` (raw `MTLBuffer` pointer only; not safe coverage: apple-metal has no public owning `MetalBuffer` constructor) |
 | `MTKMeshBuffer.offset` | property | `MTKModel.h` | `MeshBuffer::offset()` |
 | `MTKMeshBuffer.type` | property | `MTKModel.h` | `MeshBuffer::buffer_type()` |
 | `MTKSubmesh` | interface | `MTKModel.h` | `Submesh` |

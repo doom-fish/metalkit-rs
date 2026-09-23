@@ -1,21 +1,23 @@
-# MetalKit v0.2.1 coverage audit
+# MetalKit coverage audit
 
-This crate targets the MetalKit surface requested for `v0.2.1`: `MTKView`, `MTKTextureLoader`, `MTKMesh`, `MTKMeshBuffer`, `MTKSubmesh`, `MTKMeshBufferAllocator`, and the Model I/O integration APIs in `MTKModel.h`.
+This crate targets `MTKView`, `MTKTextureLoader`, `MTKMesh`, `MTKMeshBuffer`, `MTKSubmesh`, `MTKMeshBufferAllocator`, and the Model I/O integration APIs in `MTKModel.h`.
 
 ## Legend
 
 - ✅ Implemented in the safe Rust API
 - 🟡 Implemented, but exposed as a raw-pointer or JSON-backed helper because the lower-level dependency crate does not yet provide a typed wrapper
-- ⚪ Audited but intentionally not wrapped in `v0.2.1`
+- ⚪ Audited but intentionally not wrapped
+
+`MTKView` must be used on the main thread: `View::new` returns an error elsewhere, and `View` is `!Send`.
 
 ## `MTKView.h`
 
 | Header surface | Status | Notes |
 | --- | --- | --- |
 | `initWithFrame:device:` | ✅ | `View::new` |
-| `delegate` / `setDelegate:` / `MTKViewDelegate` callbacks | ✅ | `ViewDelegate`, closure trampolines, explicit notify helpers for deterministic tests |
-| `device` / `setDevice:` | ✅ | Raw Metal device pointer access |
-| `currentDrawable` | 🟡 | Raw pointer getter |
+| `delegate` / `setDelegate:` / `MTKViewDelegate` callbacks | ✅ | `ViewDelegate` (`Send` closures in a context the Swift delegate owns), explicit notify helpers for deterministic tests; `delegate_ptr` is a +0 identity pointer |
+| `device` / `setDevice:` | ✅ | `View::device` returns an apple-metal `MetalDevice` |
+| `currentDrawable` | ✅ | `View::current_drawable` returns an apple-metal `MetalDrawable` (opaque handle; apple-metal has no drawable methods yet) |
 | `framebufferOnly` | ✅ | Getter/setter |
 | `depthStencilAttachmentTextureUsage` | ✅ | Getter/setter |
 | `multisampleColorAttachmentTextureUsage` | ✅ | Getter/setter |
@@ -25,18 +27,18 @@ This crate targets the MetalKit surface requested for `v0.2.1`: `MTKView`, `MTKT
 | `depthStencilStorageMode` | ✅ | Getter/setter with macOS availability guard |
 | `sampleCount` | ✅ | Getter/setter |
 | `clearColor` / `clearDepth` / `clearStencil` | ✅ | Getter/setter |
-| `depthStencilTexture` / `multisampleColorTexture` | 🟡 | Raw pointer getters |
+| `depthStencilTexture` / `multisampleColorTexture` | ✅ | `MetalTexture` getters |
 | `releaseDrawables` | ✅ | `View::release_drawables` |
-| `currentRenderPassDescriptor` | 🟡 | Raw pointer getter |
-| `currentMTL4RenderPassDescriptor` | 🟡 | Raw pointer getter, macOS 26+ availability guard |
+| `currentRenderPassDescriptor` | ✅ | `View::current_render_pass_descriptor` returns an apple-metal `MetalRenderPassDescriptor` (opaque handle; apple-metal cannot yet build an encoder from it) |
+| `currentMTL4RenderPassDescriptor` | ✅ | `Metal4RenderPassDescriptor`; run-time macOS 26 check that returns an error on older systems |
 | `preferredFramesPerSecond` | ✅ | Getter/setter |
 | `enableSetNeedsDisplay` | ✅ | Getter/setter |
 | `autoResizeDrawable` | ✅ | Getter/setter |
 | `drawableSize` | ✅ | Getter/setter |
 | `preferredDrawableSize` | ✅ | Getter |
-| `preferredDevice` | 🟡 | Raw pointer getter |
+| `preferredDevice` | ✅ | `View::preferred_device` returns an apple-metal `MetalDevice` |
 | `paused` | ✅ | Getter/setter |
-| `colorspace` | ✅ | Getter/setter via `apple-cf::cg::CGColorSpace` |
+| `colorspace` | ✅ | Getter/setter via `apple-cf::cg::CGColorSpace` (the setter checks the CF type) |
 | `draw` | ✅ | `View::draw` |
 | keyed archiving support | ✅ | `View::archive_round_trip` |
 
@@ -61,8 +63,8 @@ This crate targets the MetalKit surface requested for `v0.2.1`: `MTKView`, `MTKT
 | Header surface | Status | Notes |
 | --- | --- | --- |
 | model error string-enum + domain / error key constants | ✅ | `ModelError` + `model_error` |
-| `MTKMeshBufferAllocator` init/device/newBuffer APIs | ✅ | `MeshBufferAllocator` |
-| `MTKMeshBuffer` allocator/zone/length/offset/type/buffer/name | ✅ | `MeshBuffer` |
+| `MTKMeshBufferAllocator` init/device/newBuffer APIs | ✅ | `MeshBufferAllocator`; `device` is only a raw pointer (`device_ptr`) |
+| `MTKMeshBuffer` allocator/zone/length/offset/type/buffer/name | ✅ | `MeshBuffer`; `buffer` is only a raw pointer (`metal_buffer_ptr`) because apple-metal has no public owning `MetalBuffer` constructor |
 | `MTKSubmesh` primitive/index/indexBuffer/indexCount/mesh/name | ✅ | `Submesh` |
 | `MTKMesh(mesh:device:)` | ✅ | `Mesh::from_model_mesh` |
 | `+newMeshesFromAsset:device:sourceMeshes:error:` | ✅ | `Mesh::new_meshes_from_asset` |

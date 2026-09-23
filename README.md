@@ -2,23 +2,33 @@
 
 Safe `Rust` bindings for Apple's [`MetalKit`](https://developer.apple.com/documentation/metalkit) framework on `macOS`.
 
-> **Status:** v0.2.1 expands the crate across `MTKView`, `MTKTextureLoader`, `MTKMesh`, `MTKMeshBuffer`, `MTKSubmesh`, `MTKMeshBufferAllocator`, and `Model I/O` integration helpers used by `MTKModel.h`.
+The crate covers `MTKView`, `MTKTextureLoader`, `MTKMesh`, `MTKMeshBuffer`, `MTKSubmesh`, `MTKMeshBufferAllocator`, and the `Model I/O` integration helpers in `MTKModel.h`.
 
-## What v0.2.1 covers
+## What it covers
 
-- `View` + `ViewDelegate` wrappers for `MTKView`
+- `View` + `ViewDelegate` wrappers for `MTKView`. The drawable, render-pass descriptors, depth/stencil and multisample textures, devices and color space come back as owned `apple-metal` / `apple-cf` values. The drawable and render-pass descriptors are `apple-metal` opaque handles without methods yet; use `as_ptr` to hand them to other Metal code.
 - `TextureLoader` sync and completion-handler loading from URLs, data, `CGImage`, `MDLTexture`, plus named-texture and batch failure handling helpers
 - `MeshBufferAllocator`, `MeshBuffer`, `Submesh`, and `Mesh` wrappers for `MetalKit` mesh bridging
 - `ModelAsset`, `ModelMesh`, `ModelTexture`, and vertex-descriptor conversion helpers for `Model I/O` integration
-- Raw-pointer accessors for `Metal` types that `apple-metal-rs` does not wrap yet (`CAMetalDrawable`, render-pass descriptors, preferred device)
 
-See [`COVERAGE.md`](COVERAGE.md) for the audited header-level checklist.
+See [`COVERAGE.md`](COVERAGE.md) for the audited header-level checklist. The audit finds a Rust item for all 108 audited symbols; three of them (`MTKTextureLoader.device`, `MTKMeshBufferAllocator.device`, `MTKMeshBuffer.buffer`) are raw pointer getters only.
 
 ## Requirements
 
-- `macOS`
+- `macOS` 11 or later; `View::current_mtl4_render_pass_descriptor` needs macOS 26 and returns an error before that
 - Xcode command-line tools / `Swift` toolchain
-- `Rust` 1.76+
+- `Rust` 1.82+
+
+```toml
+[dependencies]
+metalkit-rs = "0.3"
+```
+
+The library is imported as `metalkit`.
+
+## Threading
+
+`MTKView` is an `AppKit` view: `View::new` returns an error off the main thread, and `View` is `!Send`, so every call on it stays on the main thread. `MTKView` calls its delegate on the main thread, and `ViewDelegateCallbacks` closures must be `Send`. A draw that the draw callback triggers on the same view is skipped.
 
 ## Quick start
 
@@ -60,7 +70,7 @@ cargo test
 
 ## Notes
 
-- `MTKView` render-pass descriptors and drawables are exposed as raw pointers for now because `apple-metal-rs` does not yet ship typed wrappers for those `Metal` objects.
+- `apple-metal` can't yet create a render encoder from a render-pass descriptor or present a drawable, so a full `MTKView` draw loop still needs your own Metal code for those two steps.
 - `TextureLoader` exposes both synchronous and completion-handler APIs; see [`COVERAGE.md`](COVERAGE.md) for the exact header-level audit status.
 
 ## License
