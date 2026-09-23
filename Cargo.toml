@@ -58,6 +58,10 @@ rustdoc-args = ["--cfg", "docsrs"]
 [badges]
 maintenance = { status = "actively-developed" }
 
+[[test]]
+name = "view"
+harness = false
+
 [profile.release]
 debug = "full"
 strip = "none"

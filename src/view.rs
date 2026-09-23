@@ -2,9 +2,13 @@ use crate::error::MetalKitError;
 use crate::ffi;
 use crate::private::{handle_type, take_error};
 use apple_cf::cg::CGColorSpace;
-use apple_metal::MetalDevice;
+use apple_metal::{
+    Metal4RenderPassDescriptor, MetalDevice, MetalDrawable, MetalRenderPassDescriptor, MetalTexture,
+};
 use core::ffi::c_void;
+use doom_fish_utils::callback_context::CallbackContext;
 use std::ptr;
+use std::sync::{Mutex, MutexGuard, TryLockError};
 
 handle_type!(View, "Wraps `MTKView`.");
 
@@ -43,8 +47,8 @@ pub struct ClearColor {
     pub alpha: f64,
 }
 
-type DrawCallback = Box<dyn FnMut(&View)>;
-type ResizeCallback = Box<dyn FnMut(&View, Size)>;
+type DrawCallback = Box<dyn FnMut(&View) + Send>;
+type ResizeCallback = Box<dyn FnMut(&View, Size) + Send>;
 
 #[derive(Default)]
 /// Collects Rust callbacks that mirror `MTKViewDelegate` methods.
@@ -67,7 +71,7 @@ impl ViewDelegateCallbacks {
     /// Sets the callback that mirrors `drawInMTKView:`.
     pub fn on_draw<F>(mut self, callback: F) -> Self
     where
-        F: FnMut(&View) + 'static,
+        F: FnMut(&View) + Send + 'static,
     {
         self.draw = Some(Box::new(callback));
         self
@@ -77,7 +81,7 @@ impl ViewDelegateCallbacks {
     /// Sets the callback that mirrors `mtkView:drawableSizeWillChange:`.
     pub fn on_drawable_size_will_change<F>(mut self, callback: F) -> Self
     where
-        F: FnMut(&View, Size) + 'static,
+        F: FnMut(&View, Size) + Send + 'static,
     {
         self.resize = Some(Box::new(callback));
         self
@@ -85,14 +89,22 @@ impl ViewDelegateCallbacks {
 }
 
 struct DelegateState {
-    draw: Option<DrawCallback>,
-    resize: Option<ResizeCallback>,
+    draw: Mutex<Option<DrawCallback>>,
+    resize: Mutex<Option<ResizeCallback>>,
+}
+
+fn try_lock_slot<T>(slot: &Mutex<T>) -> Option<MutexGuard<'_, T>> {
+    match slot.try_lock() {
+        Ok(guard) => Some(guard),
+        Err(TryLockError::Poisoned(poisoned)) => Some(poisoned.into_inner()),
+        Err(TryLockError::WouldBlock) => None,
+    }
 }
 
 /// Bridges Rust closures into an `MTKViewDelegate`.
 pub struct ViewDelegate {
     ptr: *mut c_void,
-    state: *mut DelegateState,
+    state: CallbackContext<DelegateState>,
 }
 
 impl core::fmt::Debug for ViewDelegate {
@@ -106,29 +118,28 @@ impl core::fmt::Debug for ViewDelegate {
 
 impl Drop for ViewDelegate {
     fn drop(&mut self) {
+        self.state.deactivate();
         if !self.ptr.is_null() {
             unsafe { ffi::mtk_release(self.ptr) };
             self.ptr = ptr::null_mut();
-        }
-        if !self.state.is_null() {
-            unsafe { drop(Box::from_raw(self.state)) };
-            self.state = ptr::null_mut();
         }
     }
 }
 
 unsafe extern "C" fn view_draw_trampoline(user_data: *mut c_void, view: *mut c_void) {
-    if user_data.is_null() || view.is_null() {
+    if view.is_null() {
         return;
     }
-
-    let state = unsafe { &mut *user_data.cast::<DelegateState>() };
-    if let Some(callback) = state.draw.as_mut() {
-        let view = unsafe { View::from_raw_borrowed(view) };
-        // A panic unwinding across the `extern "C"` boundary into Swift is UB,
-        // so the user closure is contained here.
-        apple_cf::utils::panic_safe::catch_user_panic("MTKViewDelegate draw", || callback(&view));
-    }
+    let view = unsafe { View::from_raw_borrowed(view) };
+    let _ = unsafe {
+        CallbackContext::<DelegateState>::with(user_data, "MTKViewDelegate draw", |state| {
+            if let Some(mut slot) = try_lock_slot(&state.draw) {
+                if let Some(callback) = slot.as_mut() {
+                    callback(&view);
+                }
+            }
+        })
+    };
 }
 
 unsafe extern "C" fn view_resize_trampoline(
@@ -137,51 +148,49 @@ unsafe extern "C" fn view_resize_trampoline(
     width: f64,
     height: f64,
 ) {
-    if user_data.is_null() || view.is_null() {
+    if view.is_null() {
         return;
     }
-
-    let state = unsafe { &mut *user_data.cast::<DelegateState>() };
-    if let Some(callback) = state.resize.as_mut() {
-        let view = unsafe { View::from_raw_borrowed(view) };
-        // A panic unwinding across the `extern "C"` boundary into Swift is UB,
-        // so the user closure is contained here.
-        apple_cf::utils::panic_safe::catch_user_panic("MTKViewDelegate resize", || {
-            callback(&view, Size { width, height });
-        });
-    }
+    let view = unsafe { View::from_raw_borrowed(view) };
+    let _ = unsafe {
+        CallbackContext::<DelegateState>::with(user_data, "MTKViewDelegate resize", |state| {
+            if let Some(mut slot) = try_lock_slot(&state.resize) {
+                if let Some(callback) = slot.as_mut() {
+                    callback(&view, Size { width, height });
+                }
+            }
+        })
+    };
 }
 
 impl ViewDelegate {
     #[must_use]
     /// Creates an `MTKViewDelegate` bridge backed by Rust closures.
     pub fn new(callbacks: ViewDelegateCallbacks) -> Option<Self> {
-        let state = Box::new(DelegateState {
-            draw: callbacks.draw,
-            resize: callbacks.resize,
+        let draw = callbacks
+            .draw
+            .as_ref()
+            .map(|_| view_draw_trampoline as ffi::ViewDrawCallback);
+        let resize = callbacks
+            .resize
+            .as_ref()
+            .map(|_| view_resize_trampoline as ffi::ViewResizeCallback);
+        let state = CallbackContext::new(DelegateState {
+            draw: Mutex::new(callbacks.draw),
+            resize: Mutex::new(callbacks.resize),
         });
-        let state_ptr = Box::into_raw(state);
         let ptr = unsafe {
             ffi::mtk_view_delegate_new(
-                (*state_ptr)
-                    .draw
-                    .as_ref()
-                    .map(|_| view_draw_trampoline as ffi::ViewDrawCallback),
-                (*state_ptr)
-                    .resize
-                    .as_ref()
-                    .map(|_| view_resize_trampoline as ffi::ViewResizeCallback),
-                state_ptr.cast::<c_void>(),
+                draw,
+                resize,
+                state.retained_ptr(),
+                Some(CallbackContext::<DelegateState>::RELEASE),
             )
         };
         if ptr.is_null() {
-            unsafe { drop(Box::from_raw(state_ptr)) };
             None
         } else {
-            Some(Self {
-                ptr,
-                state: state_ptr,
-            })
+            Some(Self { ptr, state })
         }
     }
 
@@ -191,10 +200,27 @@ impl ViewDelegate {
     }
 }
 
+fn is_main_thread() -> bool {
+    unsafe { libc::pthread_main_np() != 0 }
+}
+
+fn device_with_registry_id(registry_id: u64) -> Option<MetalDevice> {
+    if registry_id == 0 {
+        return None;
+    }
+    apple_metal::copy_all_devices()
+        .into_iter()
+        .find(|device| device.registry_id() == registry_id)
+}
+
 impl View {
-    #[must_use]
     /// Creates an `MTKView`.
-    pub fn new(frame: Rect, device: Option<&MetalDevice>) -> Option<Self> {
+    pub fn new(frame: Rect, device: Option<&MetalDevice>) -> Result<Self, MetalKitError> {
+        if !is_main_thread() {
+            return Err(MetalKitError::new(
+                "MTKView must be created on the main thread",
+            ));
+        }
         unsafe {
             Self::from_raw(ffi::mtk_view_new(
                 frame.x,
@@ -204,6 +230,7 @@ impl View {
                 device.map_or(ptr::null_mut(), MetalDevice::as_ptr),
             ))
         }
+        .ok_or_else(|| MetalKitError::new("failed to create MTKView"))
     }
 
     /// Archives and unarchives this `MTKView`.
@@ -235,9 +262,9 @@ impl View {
     }
 
     #[must_use]
-    /// Returns the raw pointer from `MTKView.device`.
-    pub fn device_ptr(&self) -> *mut c_void {
-        unsafe { ffi::mtk_view_device(self.as_ptr()) }
+    /// Returns `MTKView.device`.
+    pub fn device(&self) -> Option<MetalDevice> {
+        device_with_registry_id(unsafe { ffi::mtk_view_device_registry_id(self.as_ptr()) })
     }
 
     /// Sets `MTKView.device`.
@@ -251,9 +278,10 @@ impl View {
     }
 
     #[must_use]
-    /// Returns the raw pointer from `MTKView.currentDrawable`.
-    pub fn current_drawable_ptr(&self) -> *mut c_void {
-        unsafe { ffi::mtk_view_current_drawable(self.as_ptr()) }
+    /// Returns `MTKView.currentDrawable`.
+    pub fn current_drawable(&self) -> Option<MetalDrawable> {
+        let ptr = unsafe { ffi::mtk_view_copy_current_drawable(self.as_ptr()) };
+        (!ptr.is_null()).then(|| unsafe { MetalDrawable::from_raw(ptr) })
     }
 
     #[must_use]
@@ -406,15 +434,17 @@ impl View {
     }
 
     #[must_use]
-    /// Returns the raw pointer from `MTKView.depthStencilTexture`.
-    pub fn depth_stencil_texture_ptr(&self) -> *mut c_void {
-        unsafe { ffi::mtk_view_depth_stencil_texture(self.as_ptr()) }
+    /// Returns `MTKView.depthStencilTexture`.
+    pub fn depth_stencil_texture(&self) -> Option<MetalTexture> {
+        let ptr = unsafe { ffi::mtk_view_copy_depth_stencil_texture(self.as_ptr()) };
+        (!ptr.is_null()).then(|| unsafe { MetalTexture::from_raw(ptr) })
     }
 
     #[must_use]
-    /// Returns the raw pointer from `MTKView.multisampleColorTexture`.
-    pub fn multisample_color_texture_ptr(&self) -> *mut c_void {
-        unsafe { ffi::mtk_view_multisample_color_texture(self.as_ptr()) }
+    /// Returns `MTKView.multisampleColorTexture`.
+    pub fn multisample_color_texture(&self) -> Option<MetalTexture> {
+        let ptr = unsafe { ffi::mtk_view_copy_multisample_color_texture(self.as_ptr()) };
+        (!ptr.is_null()).then(|| unsafe { MetalTexture::from_raw(ptr) })
     }
 
     /// Calls `-[MTKView releaseDrawables]`.
@@ -423,15 +453,23 @@ impl View {
     }
 
     #[must_use]
-    /// Returns the raw pointer from `MTKView.currentRenderPassDescriptor`.
-    pub fn current_render_pass_descriptor_ptr(&self) -> *mut c_void {
-        unsafe { ffi::mtk_view_current_render_pass_descriptor(self.as_ptr()) }
+    /// Returns `MTKView.currentRenderPassDescriptor`.
+    pub fn current_render_pass_descriptor(&self) -> Option<MetalRenderPassDescriptor> {
+        let ptr = unsafe { ffi::mtk_view_copy_current_render_pass_descriptor(self.as_ptr()) };
+        (!ptr.is_null()).then(|| unsafe { MetalRenderPassDescriptor::from_raw(ptr) })
     }
 
-    #[must_use]
-    /// Returns the raw pointer from `MTKView.currentMTL4RenderPassDescriptor`.
-    pub fn current_mtl4_render_pass_descriptor_ptr(&self) -> *mut c_void {
-        unsafe { ffi::mtk_view_current_mtl4_render_pass_descriptor(self.as_ptr()) }
+    /// Returns `MTKView.currentMTL4RenderPassDescriptor`.
+    pub fn current_mtl4_render_pass_descriptor(
+        &self,
+    ) -> Result<Option<Metal4RenderPassDescriptor>, MetalKitError> {
+        if !unsafe { ffi::mtk_view_supports_mtl4_render_pass_descriptor() } {
+            return Err(MetalKitError::new(
+                "MTKView.currentMTL4RenderPassDescriptor requires macOS 26.0 or later",
+            ));
+        }
+        let ptr = unsafe { ffi::mtk_view_copy_current_mtl4_render_pass_descriptor(self.as_ptr()) };
+        Ok((!ptr.is_null()).then(|| unsafe { Metal4RenderPassDescriptor::from_raw(ptr) }))
     }
 
     #[must_use]
@@ -503,9 +541,11 @@ impl View {
     }
 
     #[must_use]
-    /// Returns the raw pointer from `MTKView.preferredDevice`.
-    pub fn preferred_device_ptr(&self) -> *mut c_void {
-        unsafe { ffi::mtk_view_preferred_device(self.as_ptr()) }
+    /// Returns `MTKView.preferredDevice`.
+    pub fn preferred_device(&self) -> Option<MetalDevice> {
+        device_with_registry_id(unsafe {
+            ffi::mtk_view_preferred_device_registry_id(self.as_ptr())
+        })
     }
 
     #[must_use]
@@ -520,9 +560,10 @@ impl View {
     }
 
     #[must_use]
-    /// Returns the raw pointer from `MTKView.colorspace`.
-    pub fn colorspace_ptr(&self) -> *mut c_void {
-        unsafe { ffi::mtk_view_colorspace(self.as_ptr()) }
+    /// Returns `MTKView.colorspace`.
+    pub fn colorspace(&self) -> Option<CGColorSpace> {
+        let ptr = unsafe { ffi::mtk_view_copy_colorspace(self.as_ptr()) };
+        (!ptr.is_null()).then(|| unsafe { CGColorSpace::from_raw(ptr) })
     }
 
     /// Sets `MTKView.colorspace`.

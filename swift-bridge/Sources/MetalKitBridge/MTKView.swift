@@ -5,29 +5,50 @@ import MetalKit
 
 typealias MTKViewDrawCallback = @convention(c) (UnsafeMutableRawPointer?, UnsafeMutableRawPointer?) -> Void
 typealias MTKViewResizeCallback = @convention(c) (UnsafeMutableRawPointer?, UnsafeMutableRawPointer?, Double, Double) -> Void
+typealias MTKContextReleaseCallback = @convention(c) (UnsafeMutableRawPointer?) -> Void
+
+final class MTKContextOwner {
+    let context: UnsafeMutableRawPointer
+    private let release: MTKContextReleaseCallback
+
+    init?(_ context: UnsafeMutableRawPointer?, _ release: MTKContextReleaseCallback?) {
+        guard let context, let release else { return nil }
+        self.context = context
+        self.release = release
+    }
+
+    deinit {
+        release(context)
+    }
+}
 
 final class MTKViewDelegateBox: NSObject, MTKViewDelegate {
-    let drawCallback: MTKViewDrawCallback?
-    let resizeCallback: MTKViewResizeCallback?
-    let userData: UnsafeMutableRawPointer?
+    private let drawCallback: MTKViewDrawCallback?
+    private let resizeCallback: MTKViewResizeCallback?
+    private let owner: MTKContextOwner
 
     init(
         drawCallback: MTKViewDrawCallback?,
         resizeCallback: MTKViewResizeCallback?,
-        userData: UnsafeMutableRawPointer?
+        owner: MTKContextOwner
     ) {
         self.drawCallback = drawCallback
         self.resizeCallback = resizeCallback
-        self.userData = userData
+        self.owner = owner
     }
 
     func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {
-        resizeCallback?(userData, Unmanaged.passUnretained(view).toOpaque(), size.width, size.height)
+        resizeCallback?(owner.context, Unmanaged.passUnretained(view).toOpaque(), size.width, size.height)
     }
 
     func draw(in view: MTKView) {
-        drawCallback?(userData, Unmanaged.passUnretained(view).toOpaque())
+        drawCallback?(owner.context, Unmanaged.passUnretained(view).toOpaque())
     }
+}
+
+private func mtkView(_ ptr: UnsafeMutableRawPointer?) -> MTKView? {
+    guard Thread.isMainThread else { return nil }
+    return mtkBorrow(ptr, as: MTKView.self)
 }
 
 private func mtkPixelFormat(from rawValue: UInt) -> MTLPixelFormat {
@@ -44,19 +65,23 @@ private func mtkTextureUsage(from rawValue: UInt) -> MTLTextureUsage {
 
 private func mtkCGColorSpace(_ ptr: UnsafeMutableRawPointer?) -> CGColorSpace? {
     guard let ptr else { return nil }
-    return (Unmanaged<AnyObject>.fromOpaque(ptr).takeUnretainedValue() as! CGColorSpace)
+    let object = Unmanaged<AnyObject>.fromOpaque(ptr).takeUnretainedValue()
+    guard CFGetTypeID(object) == CGColorSpace.typeID else { return nil }
+    return Unmanaged<CGColorSpace>.fromOpaque(ptr).takeUnretainedValue()
 }
 
 @_cdecl("mtk_view_delegate_new")
 func mtk_view_delegate_new(
     _ drawCallback: MTKViewDrawCallback?,
     _ resizeCallback: MTKViewResizeCallback?,
-    _ userData: UnsafeMutableRawPointer?
+    _ context: UnsafeMutableRawPointer?,
+    _ release: MTKContextReleaseCallback?
 ) -> UnsafeMutableRawPointer? {
-    mtkTakeRetained(MTKViewDelegateBox(
+    guard let owner = MTKContextOwner(context, release) else { return nil }
+    return mtkTakeRetained(MTKViewDelegateBox(
         drawCallback: drawCallback,
         resizeCallback: resizeCallback,
-        userData: userData
+        owner: owner
     ))
 }
 
@@ -68,6 +93,7 @@ func mtk_view_new(
     _ height: Double,
     _ devicePtr: UnsafeMutableRawPointer?
 ) -> UnsafeMutableRawPointer? {
+    guard Thread.isMainThread else { return nil }
     let device: MTLDevice? = mtkBorrow(devicePtr, as: MTLDevice.self)
     let view = MTKView(
         frame: CGRect(x: x, y: y, width: width, height: height),
@@ -81,8 +107,8 @@ func mtk_view_archive_round_trip(
     _ viewPtr: UnsafeMutableRawPointer?,
     _ outError: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
 ) -> UnsafeMutableRawPointer? {
-    guard let view: MTKView = mtkBorrow(viewPtr, as: MTKView.self) else {
-        outError?.pointee = mtkDup("invalid MTKView")
+    guard let view: MTKView = mtkView(viewPtr) else {
+        outError?.pointee = mtkDup(Thread.isMainThread ? "invalid MTKView" : "MTKView must be used on the main thread")
         return nil
     }
 
@@ -102,53 +128,49 @@ func mtk_view_archive_round_trip(
 
 @_cdecl("mtk_view_delegate")
 func mtk_view_delegate(_ viewPtr: UnsafeMutableRawPointer?) -> UnsafeMutableRawPointer? {
-    guard let view: MTKView = mtkBorrow(viewPtr, as: MTKView.self),
+    guard let view: MTKView = mtkView(viewPtr),
           let delegate = view.delegate as AnyObject?
     else {
         return nil
     }
-    return mtkTakeRetained(delegate)
+    return Unmanaged.passUnretained(delegate).toOpaque()
 }
 
 @_cdecl("mtk_view_set_delegate")
 func mtk_view_set_delegate(_ viewPtr: UnsafeMutableRawPointer?, _ delegatePtr: UnsafeMutableRawPointer?) {
-    guard let view: MTKView = mtkBorrow(viewPtr, as: MTKView.self) else {
+    guard let view: MTKView = mtkView(viewPtr) else {
         return
     }
     view.delegate = mtkBorrow(delegatePtr, as: MTKViewDelegateBox.self)
 }
 
-@_cdecl("mtk_view_device")
-func mtk_view_device(_ viewPtr: UnsafeMutableRawPointer?) -> UnsafeMutableRawPointer? {
-    guard let view: MTKView = mtkBorrow(viewPtr, as: MTKView.self),
-          let device = view.device
-    else {
-        return nil
-    }
-    return Unmanaged.passUnretained(device as AnyObject).toOpaque()
+@_cdecl("mtk_view_device_registry_id")
+func mtk_view_device_registry_id(_ viewPtr: UnsafeMutableRawPointer?) -> UInt64 {
+    guard let view: MTKView = mtkView(viewPtr), let device = view.device else { return 0 }
+    return device.registryID
 }
 
 @_cdecl("mtk_view_set_device")
 func mtk_view_set_device(_ viewPtr: UnsafeMutableRawPointer?, _ devicePtr: UnsafeMutableRawPointer?) {
-    guard let view: MTKView = mtkBorrow(viewPtr, as: MTKView.self) else {
+    guard let view: MTKView = mtkView(viewPtr) else {
         return
     }
     view.device = mtkBorrow(devicePtr, as: MTLDevice.self)
 }
 
-@_cdecl("mtk_view_current_drawable")
-func mtk_view_current_drawable(_ viewPtr: UnsafeMutableRawPointer?) -> UnsafeMutableRawPointer? {
-    guard let view: MTKView = mtkBorrow(viewPtr, as: MTKView.self),
+@_cdecl("mtk_view_copy_current_drawable")
+func mtk_view_copy_current_drawable(_ viewPtr: UnsafeMutableRawPointer?) -> UnsafeMutableRawPointer? {
+    guard let view: MTKView = mtkView(viewPtr),
           let drawable = view.currentDrawable
     else {
         return nil
     }
-    return Unmanaged.passUnretained(drawable as AnyObject).toOpaque()
+    return mtkTakeRetained(drawable as AnyObject)
 }
 
 @_cdecl("mtk_view_framebuffer_only")
 func mtk_view_framebuffer_only(_ viewPtr: UnsafeMutableRawPointer?) -> Bool {
-    guard let view: MTKView = mtkBorrow(viewPtr, as: MTKView.self) else {
+    guard let view: MTKView = mtkView(viewPtr) else {
         return false
     }
     return view.framebufferOnly
@@ -156,7 +178,7 @@ func mtk_view_framebuffer_only(_ viewPtr: UnsafeMutableRawPointer?) -> Bool {
 
 @_cdecl("mtk_view_set_framebuffer_only")
 func mtk_view_set_framebuffer_only(_ viewPtr: UnsafeMutableRawPointer?, _ value: Bool) {
-    guard let view: MTKView = mtkBorrow(viewPtr, as: MTKView.self) else {
+    guard let view: MTKView = mtkView(viewPtr) else {
         return
     }
     view.framebufferOnly = value
@@ -164,7 +186,7 @@ func mtk_view_set_framebuffer_only(_ viewPtr: UnsafeMutableRawPointer?, _ value:
 
 @_cdecl("mtk_view_depth_stencil_attachment_texture_usage")
 func mtk_view_depth_stencil_attachment_texture_usage(_ viewPtr: UnsafeMutableRawPointer?) -> UInt {
-    guard let view: MTKView = mtkBorrow(viewPtr, as: MTKView.self) else {
+    guard let view: MTKView = mtkView(viewPtr) else {
         return 0
     }
     return view.depthStencilAttachmentTextureUsage.rawValue
@@ -172,7 +194,7 @@ func mtk_view_depth_stencil_attachment_texture_usage(_ viewPtr: UnsafeMutableRaw
 
 @_cdecl("mtk_view_set_depth_stencil_attachment_texture_usage")
 func mtk_view_set_depth_stencil_attachment_texture_usage(_ viewPtr: UnsafeMutableRawPointer?, _ value: UInt) {
-    guard let view: MTKView = mtkBorrow(viewPtr, as: MTKView.self) else {
+    guard let view: MTKView = mtkView(viewPtr) else {
         return
     }
     view.depthStencilAttachmentTextureUsage = mtkTextureUsage(from: value)
@@ -180,7 +202,7 @@ func mtk_view_set_depth_stencil_attachment_texture_usage(_ viewPtr: UnsafeMutabl
 
 @_cdecl("mtk_view_multisample_color_attachment_texture_usage")
 func mtk_view_multisample_color_attachment_texture_usage(_ viewPtr: UnsafeMutableRawPointer?) -> UInt {
-    guard let view: MTKView = mtkBorrow(viewPtr, as: MTKView.self) else {
+    guard let view: MTKView = mtkView(viewPtr) else {
         return 0
     }
     return view.multisampleColorAttachmentTextureUsage.rawValue
@@ -188,7 +210,7 @@ func mtk_view_multisample_color_attachment_texture_usage(_ viewPtr: UnsafeMutabl
 
 @_cdecl("mtk_view_set_multisample_color_attachment_texture_usage")
 func mtk_view_set_multisample_color_attachment_texture_usage(_ viewPtr: UnsafeMutableRawPointer?, _ value: UInt) {
-    guard let view: MTKView = mtkBorrow(viewPtr, as: MTKView.self) else {
+    guard let view: MTKView = mtkView(viewPtr) else {
         return
     }
     view.multisampleColorAttachmentTextureUsage = mtkTextureUsage(from: value)
@@ -196,7 +218,7 @@ func mtk_view_set_multisample_color_attachment_texture_usage(_ viewPtr: UnsafeMu
 
 @_cdecl("mtk_view_presents_with_transaction")
 func mtk_view_presents_with_transaction(_ viewPtr: UnsafeMutableRawPointer?) -> Bool {
-    guard let view: MTKView = mtkBorrow(viewPtr, as: MTKView.self) else {
+    guard let view: MTKView = mtkView(viewPtr) else {
         return false
     }
     return view.presentsWithTransaction
@@ -204,7 +226,7 @@ func mtk_view_presents_with_transaction(_ viewPtr: UnsafeMutableRawPointer?) -> 
 
 @_cdecl("mtk_view_set_presents_with_transaction")
 func mtk_view_set_presents_with_transaction(_ viewPtr: UnsafeMutableRawPointer?, _ value: Bool) {
-    guard let view: MTKView = mtkBorrow(viewPtr, as: MTKView.self) else {
+    guard let view: MTKView = mtkView(viewPtr) else {
         return
     }
     view.presentsWithTransaction = value
@@ -212,7 +234,7 @@ func mtk_view_set_presents_with_transaction(_ viewPtr: UnsafeMutableRawPointer?,
 
 @_cdecl("mtk_view_color_pixel_format")
 func mtk_view_color_pixel_format(_ viewPtr: UnsafeMutableRawPointer?) -> UInt {
-    guard let view: MTKView = mtkBorrow(viewPtr, as: MTKView.self) else {
+    guard let view: MTKView = mtkView(viewPtr) else {
         return 0
     }
     return view.colorPixelFormat.rawValue
@@ -220,7 +242,7 @@ func mtk_view_color_pixel_format(_ viewPtr: UnsafeMutableRawPointer?) -> UInt {
 
 @_cdecl("mtk_view_set_color_pixel_format")
 func mtk_view_set_color_pixel_format(_ viewPtr: UnsafeMutableRawPointer?, _ value: UInt) {
-    guard let view: MTKView = mtkBorrow(viewPtr, as: MTKView.self) else {
+    guard let view: MTKView = mtkView(viewPtr) else {
         return
     }
     view.colorPixelFormat = mtkPixelFormat(from: value)
@@ -228,7 +250,7 @@ func mtk_view_set_color_pixel_format(_ viewPtr: UnsafeMutableRawPointer?, _ valu
 
 @_cdecl("mtk_view_depth_stencil_pixel_format")
 func mtk_view_depth_stencil_pixel_format(_ viewPtr: UnsafeMutableRawPointer?) -> UInt {
-    guard let view: MTKView = mtkBorrow(viewPtr, as: MTKView.self) else {
+    guard let view: MTKView = mtkView(viewPtr) else {
         return 0
     }
     return view.depthStencilPixelFormat.rawValue
@@ -236,7 +258,7 @@ func mtk_view_depth_stencil_pixel_format(_ viewPtr: UnsafeMutableRawPointer?) ->
 
 @_cdecl("mtk_view_set_depth_stencil_pixel_format")
 func mtk_view_set_depth_stencil_pixel_format(_ viewPtr: UnsafeMutableRawPointer?, _ value: UInt) {
-    guard let view: MTKView = mtkBorrow(viewPtr, as: MTKView.self) else {
+    guard let view: MTKView = mtkView(viewPtr) else {
         return
     }
     view.depthStencilPixelFormat = mtkPixelFormat(from: value)
@@ -244,7 +266,7 @@ func mtk_view_set_depth_stencil_pixel_format(_ viewPtr: UnsafeMutableRawPointer?
 
 @_cdecl("mtk_view_depth_stencil_storage_mode")
 func mtk_view_depth_stencil_storage_mode(_ viewPtr: UnsafeMutableRawPointer?) -> UInt {
-    guard let view: MTKView = mtkBorrow(viewPtr, as: MTKView.self) else {
+    guard let view: MTKView = mtkView(viewPtr) else {
         return 0
     }
     if #available(macOS 13.0, *) {
@@ -255,7 +277,7 @@ func mtk_view_depth_stencil_storage_mode(_ viewPtr: UnsafeMutableRawPointer?) ->
 
 @_cdecl("mtk_view_set_depth_stencil_storage_mode")
 func mtk_view_set_depth_stencil_storage_mode(_ viewPtr: UnsafeMutableRawPointer?, _ value: UInt) {
-    guard let view: MTKView = mtkBorrow(viewPtr, as: MTKView.self) else {
+    guard let view: MTKView = mtkView(viewPtr) else {
         return
     }
     if #available(macOS 13.0, *) {
@@ -265,7 +287,7 @@ func mtk_view_set_depth_stencil_storage_mode(_ viewPtr: UnsafeMutableRawPointer?
 
 @_cdecl("mtk_view_sample_count")
 func mtk_view_sample_count(_ viewPtr: UnsafeMutableRawPointer?) -> Int {
-    guard let view: MTKView = mtkBorrow(viewPtr, as: MTKView.self) else {
+    guard let view: MTKView = mtkView(viewPtr) else {
         return 0
     }
     return view.sampleCount
@@ -273,7 +295,7 @@ func mtk_view_sample_count(_ viewPtr: UnsafeMutableRawPointer?) -> Int {
 
 @_cdecl("mtk_view_set_sample_count")
 func mtk_view_set_sample_count(_ viewPtr: UnsafeMutableRawPointer?, _ value: Int) {
-    guard let view: MTKView = mtkBorrow(viewPtr, as: MTKView.self) else {
+    guard let view: MTKView = mtkView(viewPtr) else {
         return
     }
     view.sampleCount = value
@@ -287,7 +309,7 @@ func mtk_view_clear_color(
     _ outBlue: UnsafeMutablePointer<Double>?,
     _ outAlpha: UnsafeMutablePointer<Double>?
 ) {
-    let color = (mtkBorrow(viewPtr, as: MTKView.self)?.clearColor) ?? MTLClearColorMake(0, 0, 0, 1)
+    let color = (mtkView(viewPtr)?.clearColor) ?? MTLClearColorMake(0, 0, 0, 1)
     outRed?.pointee = color.red
     outGreen?.pointee = color.green
     outBlue?.pointee = color.blue
@@ -302,7 +324,7 @@ func mtk_view_set_clear_color(
     _ blue: Double,
     _ alpha: Double
 ) {
-    guard let view: MTKView = mtkBorrow(viewPtr, as: MTKView.self) else {
+    guard let view: MTKView = mtkView(viewPtr) else {
         return
     }
     view.clearColor = MTLClearColorMake(red, green, blue, alpha)
@@ -310,7 +332,7 @@ func mtk_view_set_clear_color(
 
 @_cdecl("mtk_view_clear_depth")
 func mtk_view_clear_depth(_ viewPtr: UnsafeMutableRawPointer?) -> Double {
-    guard let view: MTKView = mtkBorrow(viewPtr, as: MTKView.self) else {
+    guard let view: MTKView = mtkView(viewPtr) else {
         return 1.0
     }
     return view.clearDepth
@@ -318,7 +340,7 @@ func mtk_view_clear_depth(_ viewPtr: UnsafeMutableRawPointer?) -> Double {
 
 @_cdecl("mtk_view_set_clear_depth")
 func mtk_view_set_clear_depth(_ viewPtr: UnsafeMutableRawPointer?, _ value: Double) {
-    guard let view: MTKView = mtkBorrow(viewPtr, as: MTKView.self) else {
+    guard let view: MTKView = mtkView(viewPtr) else {
         return
     }
     view.clearDepth = value
@@ -326,7 +348,7 @@ func mtk_view_set_clear_depth(_ viewPtr: UnsafeMutableRawPointer?, _ value: Doub
 
 @_cdecl("mtk_view_clear_stencil")
 func mtk_view_clear_stencil(_ viewPtr: UnsafeMutableRawPointer?) -> UInt32 {
-    guard let view: MTKView = mtkBorrow(viewPtr, as: MTKView.self) else {
+    guard let view: MTKView = mtkView(viewPtr) else {
         return 0
     }
     return view.clearStencil
@@ -334,64 +356,72 @@ func mtk_view_clear_stencil(_ viewPtr: UnsafeMutableRawPointer?) -> UInt32 {
 
 @_cdecl("mtk_view_set_clear_stencil")
 func mtk_view_set_clear_stencil(_ viewPtr: UnsafeMutableRawPointer?, _ value: UInt32) {
-    guard let view: MTKView = mtkBorrow(viewPtr, as: MTKView.self) else {
+    guard let view: MTKView = mtkView(viewPtr) else {
         return
     }
     view.clearStencil = value
 }
 
-@_cdecl("mtk_view_depth_stencil_texture")
-func mtk_view_depth_stencil_texture(_ viewPtr: UnsafeMutableRawPointer?) -> UnsafeMutableRawPointer? {
-    guard let view: MTKView = mtkBorrow(viewPtr, as: MTKView.self),
+@_cdecl("mtk_view_copy_depth_stencil_texture")
+func mtk_view_copy_depth_stencil_texture(_ viewPtr: UnsafeMutableRawPointer?) -> UnsafeMutableRawPointer? {
+    guard let view: MTKView = mtkView(viewPtr),
           let texture = view.depthStencilTexture
     else {
         return nil
     }
-    return Unmanaged.passUnretained(texture as AnyObject).toOpaque()
+    return mtkTakeRetained(texture as AnyObject)
 }
 
-@_cdecl("mtk_view_multisample_color_texture")
-func mtk_view_multisample_color_texture(_ viewPtr: UnsafeMutableRawPointer?) -> UnsafeMutableRawPointer? {
-    guard let view: MTKView = mtkBorrow(viewPtr, as: MTKView.self),
+@_cdecl("mtk_view_copy_multisample_color_texture")
+func mtk_view_copy_multisample_color_texture(_ viewPtr: UnsafeMutableRawPointer?) -> UnsafeMutableRawPointer? {
+    guard let view: MTKView = mtkView(viewPtr),
           let texture = view.multisampleColorTexture
     else {
         return nil
     }
-    return Unmanaged.passUnretained(texture as AnyObject).toOpaque()
+    return mtkTakeRetained(texture as AnyObject)
 }
 
 @_cdecl("mtk_view_release_drawables")
 func mtk_view_release_drawables(_ viewPtr: UnsafeMutableRawPointer?) {
-    guard let view: MTKView = mtkBorrow(viewPtr, as: MTKView.self) else {
+    guard let view: MTKView = mtkView(viewPtr) else {
         return
     }
     view.releaseDrawables()
 }
 
-@_cdecl("mtk_view_current_render_pass_descriptor")
-func mtk_view_current_render_pass_descriptor(_ viewPtr: UnsafeMutableRawPointer?) -> UnsafeMutableRawPointer? {
-    guard let view: MTKView = mtkBorrow(viewPtr, as: MTKView.self),
+@_cdecl("mtk_view_copy_current_render_pass_descriptor")
+func mtk_view_copy_current_render_pass_descriptor(_ viewPtr: UnsafeMutableRawPointer?) -> UnsafeMutableRawPointer? {
+    guard let view: MTKView = mtkView(viewPtr),
           let descriptor = view.currentRenderPassDescriptor
     else {
         return nil
     }
-    return Unmanaged.passUnretained(descriptor).toOpaque()
+    return mtkTakeRetained(descriptor)
 }
 
-@available(macOS 26.0, *)
-@_cdecl("mtk_view_current_mtl4_render_pass_descriptor")
-func mtk_view_current_mtl4_render_pass_descriptor(_ viewPtr: UnsafeMutableRawPointer?) -> UnsafeMutableRawPointer? {
-    guard let view: MTKView = mtkBorrow(viewPtr, as: MTKView.self),
+@_cdecl("mtk_view_supports_mtl4_render_pass_descriptor")
+func mtk_view_supports_mtl4_render_pass_descriptor() -> Bool {
+    if #available(macOS 26.0, *) {
+        return true
+    }
+    return false
+}
+
+@_cdecl("mtk_view_copy_current_mtl4_render_pass_descriptor")
+func mtk_view_copy_current_mtl4_render_pass_descriptor(_ viewPtr: UnsafeMutableRawPointer?) -> UnsafeMutableRawPointer? {
+    guard #available(macOS 26.0, *),
+          let view: MTKView = mtkView(viewPtr),
           let descriptor = view.currentMTL4RenderPassDescriptor
     else {
         return nil
     }
-    return Unmanaged.passUnretained(descriptor).toOpaque()
+    return mtkTakeRetained(descriptor)
 }
 
 @_cdecl("mtk_view_preferred_frames_per_second")
 func mtk_view_preferred_frames_per_second(_ viewPtr: UnsafeMutableRawPointer?) -> Int {
-    guard let view: MTKView = mtkBorrow(viewPtr, as: MTKView.self) else {
+    guard let view: MTKView = mtkView(viewPtr) else {
         return 0
     }
     return view.preferredFramesPerSecond
@@ -399,7 +429,7 @@ func mtk_view_preferred_frames_per_second(_ viewPtr: UnsafeMutableRawPointer?) -
 
 @_cdecl("mtk_view_set_preferred_frames_per_second")
 func mtk_view_set_preferred_frames_per_second(_ viewPtr: UnsafeMutableRawPointer?, _ value: Int) {
-    guard let view: MTKView = mtkBorrow(viewPtr, as: MTKView.self) else {
+    guard let view: MTKView = mtkView(viewPtr) else {
         return
     }
     view.preferredFramesPerSecond = value
@@ -407,7 +437,7 @@ func mtk_view_set_preferred_frames_per_second(_ viewPtr: UnsafeMutableRawPointer
 
 @_cdecl("mtk_view_enable_set_needs_display")
 func mtk_view_enable_set_needs_display(_ viewPtr: UnsafeMutableRawPointer?) -> Bool {
-    guard let view: MTKView = mtkBorrow(viewPtr, as: MTKView.self) else {
+    guard let view: MTKView = mtkView(viewPtr) else {
         return false
     }
     return view.enableSetNeedsDisplay
@@ -415,7 +445,7 @@ func mtk_view_enable_set_needs_display(_ viewPtr: UnsafeMutableRawPointer?) -> B
 
 @_cdecl("mtk_view_set_enable_set_needs_display")
 func mtk_view_set_enable_set_needs_display(_ viewPtr: UnsafeMutableRawPointer?, _ value: Bool) {
-    guard let view: MTKView = mtkBorrow(viewPtr, as: MTKView.self) else {
+    guard let view: MTKView = mtkView(viewPtr) else {
         return
     }
     view.enableSetNeedsDisplay = value
@@ -423,7 +453,7 @@ func mtk_view_set_enable_set_needs_display(_ viewPtr: UnsafeMutableRawPointer?, 
 
 @_cdecl("mtk_view_auto_resize_drawable")
 func mtk_view_auto_resize_drawable(_ viewPtr: UnsafeMutableRawPointer?) -> Bool {
-    guard let view: MTKView = mtkBorrow(viewPtr, as: MTKView.self) else {
+    guard let view: MTKView = mtkView(viewPtr) else {
         return false
     }
     return view.autoResizeDrawable
@@ -431,7 +461,7 @@ func mtk_view_auto_resize_drawable(_ viewPtr: UnsafeMutableRawPointer?) -> Bool 
 
 @_cdecl("mtk_view_set_auto_resize_drawable")
 func mtk_view_set_auto_resize_drawable(_ viewPtr: UnsafeMutableRawPointer?, _ value: Bool) {
-    guard let view: MTKView = mtkBorrow(viewPtr, as: MTKView.self) else {
+    guard let view: MTKView = mtkView(viewPtr) else {
         return
     }
     view.autoResizeDrawable = value
@@ -443,14 +473,14 @@ func mtk_view_drawable_size(
     _ outWidth: UnsafeMutablePointer<Double>?,
     _ outHeight: UnsafeMutablePointer<Double>?
 ) {
-    let size = (mtkBorrow(viewPtr, as: MTKView.self)?.drawableSize) ?? .zero
+    let size = (mtkView(viewPtr)?.drawableSize) ?? .zero
     outWidth?.pointee = size.width
     outHeight?.pointee = size.height
 }
 
 @_cdecl("mtk_view_set_drawable_size")
 func mtk_view_set_drawable_size(_ viewPtr: UnsafeMutableRawPointer?, _ width: Double, _ height: Double) {
-    guard let view: MTKView = mtkBorrow(viewPtr, as: MTKView.self) else {
+    guard let view: MTKView = mtkView(viewPtr) else {
         return
     }
     view.drawableSize = CGSize(width: width, height: height)
@@ -462,24 +492,20 @@ func mtk_view_preferred_drawable_size(
     _ outWidth: UnsafeMutablePointer<Double>?,
     _ outHeight: UnsafeMutablePointer<Double>?
 ) {
-    let size = (mtkBorrow(viewPtr, as: MTKView.self)?.preferredDrawableSize) ?? .zero
+    let size = (mtkView(viewPtr)?.preferredDrawableSize) ?? .zero
     outWidth?.pointee = size.width
     outHeight?.pointee = size.height
 }
 
-@_cdecl("mtk_view_preferred_device")
-func mtk_view_preferred_device(_ viewPtr: UnsafeMutableRawPointer?) -> UnsafeMutableRawPointer? {
-    guard let view: MTKView = mtkBorrow(viewPtr, as: MTKView.self),
-          let device = view.preferredDevice
-    else {
-        return nil
-    }
-    return Unmanaged.passUnretained(device as AnyObject).toOpaque()
+@_cdecl("mtk_view_preferred_device_registry_id")
+func mtk_view_preferred_device_registry_id(_ viewPtr: UnsafeMutableRawPointer?) -> UInt64 {
+    guard let view: MTKView = mtkView(viewPtr), let device = view.preferredDevice else { return 0 }
+    return device.registryID
 }
 
 @_cdecl("mtk_view_is_paused")
 func mtk_view_is_paused(_ viewPtr: UnsafeMutableRawPointer?) -> Bool {
-    guard let view: MTKView = mtkBorrow(viewPtr, as: MTKView.self) else {
+    guard let view: MTKView = mtkView(viewPtr) else {
         return false
     }
     return view.isPaused
@@ -487,25 +513,25 @@ func mtk_view_is_paused(_ viewPtr: UnsafeMutableRawPointer?) -> Bool {
 
 @_cdecl("mtk_view_set_paused")
 func mtk_view_set_paused(_ viewPtr: UnsafeMutableRawPointer?, _ value: Bool) {
-    guard let view: MTKView = mtkBorrow(viewPtr, as: MTKView.self) else {
+    guard let view: MTKView = mtkView(viewPtr) else {
         return
     }
     view.isPaused = value
 }
 
-@_cdecl("mtk_view_colorspace")
-func mtk_view_colorspace(_ viewPtr: UnsafeMutableRawPointer?) -> UnsafeMutableRawPointer? {
-    guard let view: MTKView = mtkBorrow(viewPtr, as: MTKView.self),
+@_cdecl("mtk_view_copy_colorspace")
+func mtk_view_copy_colorspace(_ viewPtr: UnsafeMutableRawPointer?) -> UnsafeMutableRawPointer? {
+    guard let view: MTKView = mtkView(viewPtr),
           let colorspace = view.colorspace
     else {
         return nil
     }
-    return Unmanaged.passUnretained(colorspace as AnyObject).toOpaque()
+    return mtkTakeRetained(colorspace)
 }
 
 @_cdecl("mtk_view_set_colorspace")
 func mtk_view_set_colorspace(_ viewPtr: UnsafeMutableRawPointer?, _ value: UnsafeMutableRawPointer?) {
-    guard let view: MTKView = mtkBorrow(viewPtr, as: MTKView.self) else {
+    guard let view: MTKView = mtkView(viewPtr) else {
         return
     }
     view.colorspace = mtkCGColorSpace(value)
@@ -513,7 +539,7 @@ func mtk_view_set_colorspace(_ viewPtr: UnsafeMutableRawPointer?, _ value: Unsaf
 
 @_cdecl("mtk_view_draw")
 func mtk_view_draw(_ viewPtr: UnsafeMutableRawPointer?) {
-    guard let view: MTKView = mtkBorrow(viewPtr, as: MTKView.self) else {
+    guard let view: MTKView = mtkView(viewPtr) else {
         return
     }
     view.draw()
@@ -521,7 +547,7 @@ func mtk_view_draw(_ viewPtr: UnsafeMutableRawPointer?) {
 
 @_cdecl("mtk_view_notify_delegate_size_will_change")
 func mtk_view_notify_delegate_size_will_change(_ viewPtr: UnsafeMutableRawPointer?) {
-    guard let view: MTKView = mtkBorrow(viewPtr, as: MTKView.self) else {
+    guard let view: MTKView = mtkView(viewPtr) else {
         return
     }
     view.delegate?.mtkView(view, drawableSizeWillChange: view.drawableSize)
@@ -529,7 +555,7 @@ func mtk_view_notify_delegate_size_will_change(_ viewPtr: UnsafeMutableRawPointe
 
 @_cdecl("mtk_view_notify_delegate_draw")
 func mtk_view_notify_delegate_draw(_ viewPtr: UnsafeMutableRawPointer?) {
-    guard let view: MTKView = mtkBorrow(viewPtr, as: MTKView.self) else {
+    guard let view: MTKView = mtkView(viewPtr) else {
         return
     }
     view.delegate?.draw(in: view)
