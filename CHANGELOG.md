@@ -1,5 +1,63 @@
 # Changelog
 
+All notable changes to `metalkit-rs` are documented here.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [0.3.0] - Unreleased
+
+### Security
+
+- `View::delegate_ptr` returned the delegate box at +1 while every other
+  getter returned +0, so each call leaked a reference. A leaked box outlived
+  its `ViewDelegate`, whose drop freed the closure state, and stayed the
+  view's weak delegate, so the next `draw(in:)` read freed memory. The getter
+  now returns +0, and the closure state lives in a reference-counted context
+  owned by the Swift delegate box, which a dropped `ViewDelegate` deactivates.
+- Panics in `MTKViewDelegate` callbacks are contained instead of unwinding
+  into Swift.
+
+### Fixed
+
+- `View::current_mtl4_render_pass_descriptor` called a macOS 26 API with no
+  run-time check against the macOS 11 minimum and aborted on macOS 11 to 15;
+  it now returns an error there.
+- `View::new` created an `AppKit` view on any thread; it now refuses to run
+  off the main thread, and the bridge refuses view calls off the main thread.
+- A draw that the draw callback triggers on the same view is skipped instead of
+  deadlocking.
+- The color-space setter and the `CGImage` texture loaders force-cast their
+  arguments with `as!`, which Swift does not check for CF types; they now
+  check the CF type ID. The data loaders and `MeshBufferAllocator` no longer
+  force-unwrap the byte pointer.
+- COVERAGE files counted raw pointer getters as covered; README gave a stale
+  status and no minimums.
+
+### Changed
+
+- **Breaking:** `View::new` returns `Result<View, MetalKitError>`.
+- **Breaking:** `ViewDelegateCallbacks::on_draw` and
+  `on_drawable_size_will_change` require `Send` closures.
+- **Breaking:** the `View` raw pointer getters are replaced by typed getters
+  that return owned values: `device` and `preferred_device` (`MetalDevice`),
+  `current_drawable` (`MetalDrawable`), `current_render_pass_descriptor`
+  (`MetalRenderPassDescriptor`), `current_mtl4_render_pass_descriptor`
+  (`Result<Option<Metal4RenderPassDescriptor>, MetalKitError>`),
+  `depth_stencil_texture` and `multisample_color_texture` (`MetalTexture`) and
+  `colorspace` (`CGColorSpace`). `delegate_ptr` stays as a +0 pointer.
+- Requires `apple-cf >=0.11, <0.12` and `apple-metal >=0.10, <0.11`, and adds
+  `doom-fish-utils >=0.4.1, <0.5`; `rust-version` is 1.82 (was 1.76).
+- The `TextureLoaderOptionsRaw` layout is pinned with compile-time size and
+  alignment checks and a cross-language `mtk_verify_ffi_layout` check.
+
+### Removed
+
+- `View::device_ptr`, `preferred_device_ptr`, `current_drawable_ptr`,
+  `current_render_pass_descriptor_ptr`,
+  `current_mtl4_render_pass_descriptor_ptr`, `depth_stencil_texture_ptr`,
+  `multisample_color_texture_ptr` and `colorspace_ptr`.
+
 ## [0.2.5] - 2026-05-18
 
 - Added one-line Rustdoc coverage across the public MetalKit surface in `src/`, including wrapper types, enums, option constants, and view/loader/model helpers.
