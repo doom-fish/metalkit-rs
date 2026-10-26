@@ -255,7 +255,7 @@ fn texture_loader_completion_handlers_surface_array_and_named_errors() {
             .expect("schedule named callback");
     })
     .expect_err("named callback should fail");
-    assert!(!named_error.is_empty());
+    assert_ne!(named_error, "");
 
     let named_gamut_error = receive_texture_size_result(|tx| {
         loader
@@ -277,7 +277,7 @@ fn texture_loader_completion_handlers_surface_array_and_named_errors() {
             .expect("schedule named gamut callback");
     })
     .expect_err("named gamut callback should fail");
-    assert!(!named_gamut_error.is_empty());
+    assert_ne!(named_gamut_error, "");
 
     let (named_statuses, named_array_error) = receive_array_outcome(|tx| {
         loader
