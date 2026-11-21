@@ -21,7 +21,7 @@ See [`COVERAGE.md`](COVERAGE.md) for the audited header-level checklist. The aud
 
 ```toml
 [dependencies]
-metalkit-rs = "0.3"
+metalkit-rs = "0.4.0"
 ```
 
 The library is imported as `metalkit`.
