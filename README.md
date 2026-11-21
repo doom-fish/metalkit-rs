@@ -68,6 +68,12 @@ cargo clippy --all-targets -- -D warnings
 cargo test
 ```
 
+CI uses published crates from crates.io.
+The Clippy duplicate dependency exceptions are `apple-cf` and `doom-fish-utils`.
+`apple-metal` 0.10.4 needs `doom-fish-utils` 0.4, and its default `iosurface` feature needs `apple-cf` 0.11.
+The `iosurface` feature exposes the `IOSurfaceMetalExt` trait.
+When the dependency graph has one version of each crate, remove the exceptions.
+
 ## Notes
 
 - `apple-metal` can't yet create a render encoder from a render-pass descriptor or present a drawable, so a full `MTKView` draw loop still needs your own Metal code for those two steps.
