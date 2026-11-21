@@ -66,10 +66,13 @@ public func mtk_mesh_buffer_copy_bytes(
         return 0
     }
 
-    let contents = buffer.buffer.contents()
-    let available = max(0, buffer.length - buffer.offset)
-    let count = min(len, available)
-    memcpy(dst, contents.advanced(by: buffer.offset), count)
+    let backing = buffer.buffer
+    let offset = buffer.offset
+    guard offset >= 0, offset < backing.length,
+          backing.storageMode == .shared || backing.storageMode == .managed else { return 0 }
+    let count = min(len, buffer.length, backing.length - offset)
+    guard count > 0 else { return 0 }
+    memcpy(dst, backing.contents().advanced(by: offset), count)
     return count
 }
 
